@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDRDSS — Analysis History</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #38bdf8;
+            border-bottom: 2px solid #1e293b;
+            padding-bottom: 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 2rem;
+            background-color: #1e293b;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 1px solid #334155;
+        }
+
+        th {
+            background-color: #0f172a;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background-color: #334155;
+        }
+
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .badge-CRITICAL {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .badge-HIGH {
+            background-color: #f97316;
+            color: white;
+        }
+
+        .badge-MEDIUM {
+            background-color: #eab308;
+            color: black;
+        }
+
+        .badge-LOW {
+            background-color: #22c55e;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header style="display: flex; justify-content: space-between; align-items: center;">
+            <h1>Analysis History Log</h1>
+            <a href="/dashboard" style="color: #38bdf8; text-decoration: none;">&larr; Back to Dashboard</a>
+        </header>
+
+        <table id="historyTable">
+            <thead>
+                <tr>
+                    <th>Timestamp (UTC)</th>
+                    <th>Location</th>
+                    <th>Severity</th>
+                    <th>Priority Score</th>
+                    <th>Label</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Populated by JS -->
+            </tbody>
+        </table>
+        <div id="loading" style="text-align: center; margin-top: 2rem;">Loading history...</div>
+    </div>
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/history.js"></script>
+</body>
+
+</html>

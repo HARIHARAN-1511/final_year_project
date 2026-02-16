@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDRDSS — Dashboard</title>
+    <meta name="description"
+        content="Real-time disaster analysis dashboard with map, AI insights, and PDF report export.">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+
+    <!-- App CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+
+    <!-- ===== TOP STATUS BAR ===== -->
+    <header id="topBar" class="top-bar">
+        <div class="top-bar-left">
+            <a href="/" class="system-badge" title="Back to Landing Page">
+                <span class="badge-icon">🛡️</span>
+                <span class="badge-text">PDRDSS</span>
+            </a>
+            <div id="priorityBadge" class="priority-badge priority-none">
+                <span class="priority-dot"></span>
+                <span id="priorityText">STANDBY</span>
+            </div>
+        </div>
+        <div class="top-bar-center">
+            <div class="info-cell">
+                <span class="info-label">DISASTER</span>
+                <span id="infoDisasterType" class="info-value">—</span>
+            </div>
+            <div class="info-divider"></div>
+            <div class="info-cell">
+                <span class="info-label">LOCATION</span>
+                <span id="infoLocation" class="info-value">—</span>
+            </div>
+            <div class="info-divider"></div>
+            <div class="info-cell">
+                <span class="info-label">COORDINATES</span>
+                <span id="infoCoords" class="info-value mono">—</span>
+            </div>
+            <div class="info-divider"></div>
+            <div class="info-cell">
+                <span class="info-label">CONFIDENCE</span>
+                <span id="infoConfidence" class="info-value">—</span>
+            </div>
+            <div class="info-divider"></div>
+            <div class="info-cell">
+                <span class="info-label">UPDATED</span>
+                <span id="infoUpdated" class="info-value mono">—</span>
+            </div>
+        </div>
+        <div class="top-bar-right">
+            <div id="loadingIndicator" class="loading-indicator hidden">
+                <div class="spinner"></div>
+                <span>Fetching...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ===== DATA FRESHNESS STRIP ===== -->
+    <div id="dataFreshnessStrip" class="data-freshness-strip hidden">
+        <div class="freshness-item">
+            <span class="freshness-source">USGS</span>
+            <span id="freshTs_disaster" class="freshness-ts">—</span>
+        </div>
+        <div class="freshness-divider">|</div>
+        <div class="freshness-item">
+            <span class="freshness-source">NOAA</span>
+            <span id="freshTs_cyclone" class="freshness-ts">—</span>
+        </div>
+        <div class="freshness-divider">|</div>
+        <div class="freshness-item">
+            <span class="freshness-source">GDELT</span>
+            <span id="freshTs_news" class="freshness-ts">—</span>
+        </div>
+        <div class="freshness-divider">|</div>
+        <div class="freshness-item">
+            <span class="freshness-source">Imagery</span>
+            <span id="freshTs_imagery" class="freshness-ts">Pre-disaster</span>
+        </div>
+    </div>
+
+    <!-- ===== INPUT BAR ===== -->
+    <section class="input-bar">
+        <div class="input-group">
+            <label for="locationInput" class="input-label">📍 Location</label>
+            <input type="text" id="locationInput" placeholder="Enter city, region, or lat,lon" autocomplete="off">
+        </div>
+        <div class="input-group">
+            <label for="disasterType" class="input-label">⚡ Disaster Type</label>
+            <select id="disasterType">
+                <option value="earthquake">🌍 Earthquake</option>
+                <option value="cyclone">🌪️ Cyclone / Hurricane</option>
+            </select>
+        </div>
+        <button id="analyzeBtn" class="btn-analyze">
+            <span class="btn-icon">🔍</span>
+            <span>Analyze</span>
+        </button>
+        <button id="downloadPdfBtn" class="btn-download" disabled title="Run analysis first to generate report">
+            <span class="btn-icon">📄</span>
+            <span>Download PDF Report</span>
+        </button>
+    </section>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <main class="main-content">
+        <!-- MAP AREA -->
+        <div class="map-container">
+            <div id="map"></div>
+
+            <!-- Map controls overlay -->
+            <div class="map-controls">
+                <button id="recenterBtn" class="map-control-btn" title="Recenter to disaster location">
+                    🎯 Recenter
+                </button>
+                <!-- Map View Toggle -->
+                <div class="map-view-toggle">
+                    <button class="map-view-btn active" data-view="satellite" title="Satellite View">🛰️
+                        Satellite</button>
+                    <button class="map-view-btn" data-view="street" title="Street Map View">🗺️ Street</button>
+                    <button class="map-view-btn" data-view="grid" title="Urban Grid / OSM Vector">🏙️ Grid</button>
+                </div>
+            </div>
+
+            <!-- Satellite imagery disclaimer -->
+            <div class="imagery-note">
+                📡 Base imagery is pre-disaster (not real-time capture) — Source: Esri, Maxar, Earthstar Geographics
+            </div>
+
+            <!-- Layer toggles -->
+            <div class="layer-panel">
+                <div class="layer-panel-title">Map Layers</div>
+                <label class="layer-toggle">
+                    <input type="checkbox" id="layerDamage" checked>
+                    <span class="toggle-slider"></span>
+                    <span class="layer-name">🔴 Damage Zones</span>
+                </label>
+                <label class="layer-toggle">
+                    <input type="checkbox" id="layerNews" checked>
+                    <span class="toggle-slider"></span>
+                    <span class="layer-name">📰 Ground Reports</span>
+                </label>
+                <label class="layer-toggle">
+                    <input type="checkbox" id="layerResources" checked>
+                    <span class="toggle-slider"></span>
+                    <span class="layer-name">🏥 Emergency Resources</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- DECISION PANELS -->
+        <div class="decision-grid">
+            <!-- Disaster Info -->
+            <div class="panel" id="panelInfo">
+                <div class="panel-header">
+                    <h3>📊 Disaster Information</h3>
+                    <span class="freshness-badge" id="freshInfo">⚪ N/A</span>
+                </div>
+                <div class="panel-body" id="panelInfoBody">
+                    <div class="empty-state">Enter a location and disaster type to begin analysis</div>
+                </div>
+            </div>
+
+            <!-- Population Exposure -->
+            <div class="panel" id="panelPopulation">
+                <div class="panel-header">
+                    <h3>👥 Population Exposure</h3>
+                    <div class="ai-badge">📊 Estimated</div>
+                </div>
+                <div class="panel-body" id="panelPopulationBody">
+                    <div class="empty-state">Population exposure will appear after analysis</div>
+                </div>
+            </div>
+
+            <!-- Recommended Teams -->
+            <div class="panel" id="panelTeams">
+                <div class="panel-header">
+                    <h3>👥 Recommended Teams</h3>
+                    <div class="ai-badge">🤖 AI Analysis</div>
+                </div>
+                <div class="panel-body" id="panelTeamsBody">
+                    <div class="empty-state">Awaiting disaster data</div>
+                </div>
+            </div>
+
+            <!-- Key Concerns -->
+            <div class="panel" id="panelConcerns">
+                <div class="panel-header">
+                    <h3>⚠️ Key Concerns</h3>
+                    <div class="ai-badge">🤖 AI Analysis</div>
+                </div>
+                <div class="panel-body" id="panelConcernsBody">
+                    <div class="empty-state">Awaiting disaster data</div>
+                </div>
+            </div>
+
+            <!-- Nearby Resources -->
+            <div class="panel" id="panelResources">
+                <div class="panel-header">
+                    <h3>🏥 Nearby Resources</h3>
+                    <span class="freshness-badge" id="freshResources">⚪ N/A</span>
+                </div>
+                <div class="panel-body" id="panelResourcesBody">
+                    <div class="empty-state">Awaiting location data</div>
+                </div>
+            </div>
+
+            <!-- Resource Allocation -->
+            <div class="panel" id="panelAllocation">
+                <div class="panel-header">
+                    <h3>📦 Resource Allocation</h3>
+                    <div class="ai-badge">🎓 Academic Demo</div>
+                </div>
+                <div class="panel-body" id="panelAllocationBody">
+                    <div class="empty-state">Resource allocation will appear after analysis</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEWS FEED -->
+        <div class="news-section">
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>📰 Real-Time News & Ground Reports</h3>
+                    <span class="freshness-badge" id="freshNews">⚪ N/A</span>
+                </div>
+                <div class="panel-body news-grid" id="newsBody">
+                    <div class="empty-state">News articles will appear after analysis</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ===== STREET VIEW SIDE PANEL ===== -->
+    <div id="streetViewPanel" class="street-view-panel hidden">
+        <div class="sv-header">
+            <h3>📷 Street-Level View</h3>
+            <button id="svCloseBtn" class="sv-close-btn">✕</button>
+        </div>
+        <div class="sv-body" id="svBody">
+            <div class="empty-state">Click a location on the map to view street-level imagery</div>
+        </div>
+        <div class="sv-footer">
+            <span class="sv-disclaimer">Imagery may not reflect post-disaster conditions</span>
+        </div>
+    </div>
+
+    <!-- ===== FOOTER DISCLAIMER ===== -->
+    <footer class="footer-disclaimer">
+        <p>⚠️ <strong>ACADEMIC PROTOTYPE</strong> — This system provides AI-assisted decision support for research
+            purposes only. Final decisions must be made by trained emergency responders.</p>
+        <p class="footer-ethics">🛡️ Population exposure estimates use public census-based density models (WorldPop). No
+            mobile tracking or telecom data is used.</p>
+    </footer>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <!-- jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.0/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.3/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- Auth JS -->
+    <script src="/static/js/auth.js"></script>
+    <script>
+        // Protect this page
+        document.addEventListener('DOMContentLoaded', () => {
+            requireAuth();
+        });
+    </script>
+
+    <!-- App JS -->
+    <script src="/static/js/app.js"></script>
+
+</body>
+
+</html>

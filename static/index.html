@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDRDSS — Live Earthquake Tracker & Disaster Support</title>
+    <meta name="description"
+        content="Real-time earthquake tracking with interactive map, magnitude filtering, and AI-powered disaster analysis. Data from USGS.">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/static/css/landing.css">
+</head>
+
+<body>
+
+    <!-- Animated background particles -->
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+    <div class="bg-glow bg-glow-3"></div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="nav-icon">🛡️</span>
+            <span class="nav-title">PDRDSS</span>
+        </div>
+        <div class="nav-links">
+            <a href="#earthquake-map">Map</a>
+            <a href="#earthquake-tracker">Earthquakes</a>
+            <a href="#features">Features</a>
+            <a href="#data-sources">Data Sources</a>
+            <a href="/login">Dashboard</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-badge">
+            <span class="badge-pulse"></span>
+            <span>Real-Time Earthquake Tracker</span>
+        </div>
+        <h1 class="hero-title">
+            Global Earthquake<br>
+            <span class="hero-gradient">Live Tracker & Analysis</span>
+        </h1>
+        <p class="hero-subtitle">
+            Track every earthquake worldwide in real time. Interactive map, magnitude filtering,
+            location search, and AI-powered disaster analysis — all from live USGS data.
+        </p>
+
+        <!-- Location Search Bar (EarthquakeTrack-style) -->
+        <div class="search-container" id="searchContainer">
+            <div class="search-input-wrapper">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="locationSearch" class="search-input"
+                    placeholder="Search by city, country, or coordinates (e.g. Tokyo, California, 35.6, 139.7)"
+                    autocomplete="off">
+                <button id="searchBtn" class="search-btn">
+                    <span>Search</span>
+                </button>
+                <button id="myLocationBtn" class="location-btn" title="Use my location">📍</button>
+            </div>
+            <div class="search-suggestions" id="searchSuggestions"></div>
+        </div>
+
+        <!-- Live Stats Counter -->
+        <div class="hero-stats">
+            <div class="stat">
+                <span class="stat-number" id="statEq24h">—</span>
+                <span class="stat-label">Last 24 Hours</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <span class="stat-number" id="statEq7d">—</span>
+                <span class="stat-label">Last 7 Days</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <span class="stat-number" id="statEq30d">—</span>
+                <span class="stat-label">Last 30 Days</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <span class="stat-number" id="statMaxMag">—</span>
+                <span class="stat-label">Biggest Today</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== INTERACTIVE EARTHQUAKE MAP ===== -->
+    <section id="earthquake-map" class="map-section">
+        <div class="map-header">
+            <h2 class="section-title">🗺️ Earthquake Map</h2>
+            <p class="section-subtitle">Interactive map showing recent earthquakes worldwide. Click any marker for
+                details.</p>
+            <div class="map-controls">
+                <div class="map-filter-group">
+                    <label>Time Range:</label>
+                    <select id="mapTimeFilter" class="map-select">
+                        <option value="hour">Past Hour</option>
+                        <option value="day" selected>Past 24 Hours</option>
+                        <option value="week">Past 7 Days</option>
+                        <option value="month">Past 30 Days</option>
+                    </select>
+                </div>
+                <div class="map-filter-group">
+                    <label>Min Magnitude:</label>
+                    <select id="mapMagFilter" class="map-select">
+                        <option value="all">All</option>
+                        <option value="1.0">M1.0+</option>
+                        <option value="2.5" selected>M2.5+</option>
+                        <option value="4.5">M4.5+</option>
+                        <option value="6.0">M6.0+ (Major)</option>
+                    </select>
+                </div>
+                <button id="mapRefreshBtn" class="map-refresh-btn">🔄 Refresh</button>
+            </div>
+        </div>
+        <div class="map-wrapper">
+            <div id="earthquakeMap" class="earthquake-map"></div>
+            <div class="map-legend">
+                <div class="legend-title">Magnitude</div>
+                <div class="legend-item"><span class="legend-dot"
+                        style="background:#22c55e;width:8px;height:8px;"></span> &lt; 3.0</div>
+                <div class="legend-item"><span class="legend-dot"
+                        style="background:#eab308;width:11px;height:11px;"></span> 3.0 – 4.9</div>
+                <div class="legend-item"><span class="legend-dot"
+                        style="background:#f97316;width:14px;height:14px;"></span> 5.0 – 5.9</div>
+                <div class="legend-item"><span class="legend-dot"
+                        style="background:#ef4444;width:17px;height:17px;"></span> 6.0 – 6.9</div>
+                <div class="legend-item"><span class="legend-dot"
+                        style="background:#dc2626;width:22px;height:22px;"></span> 7.0+</div>
+            </div>
+        </div>
+        <div class="map-status" id="mapStatus">
+            <span class="feed-live-dot"></span>
+            <span id="mapStatusText">Loading earthquake data...</span>
+        </div>
+    </section>
+
+    <!-- ===== POPULAR REGIONS (EarthquakeTrack-style) ===== -->
+    <section class="regions-section">
+        <h2 class="section-title">🌎 Popular Earthquake Regions</h2>
+        <p class="section-subtitle">Quick access to seismically active regions worldwide</p>
+        <div class="regions-grid">
+            <button class="region-btn" data-lat="34.05" data-lon="-118.24" data-name="Los Angeles, California">
+                <span class="region-flag">🇺🇸</span>
+                <span class="region-name">Los Angeles</span>
+            </button>
+            <button class="region-btn" data-lat="35.68" data-lon="139.69" data-name="Tokyo, Japan">
+                <span class="region-flag">🇯🇵</span>
+                <span class="region-name">Tokyo</span>
+            </button>
+            <button class="region-btn" data-lat="-33.44" data-lon="-70.65" data-name="Santiago, Chile">
+                <span class="region-flag">🇨🇱</span>
+                <span class="region-name">Chile</span>
+            </button>
+            <button class="region-btn" data-lat="38.72" data-lon="20.71" data-name="Greece">
+                <span class="region-flag">🇬🇷</span>
+                <span class="region-name">Greece</span>
+            </button>
+            <button class="region-btn" data-lat="-6.17" data-lon="106.84" data-name="Indonesia">
+                <span class="region-flag">🇮🇩</span>
+                <span class="region-name">Indonesia</span>
+            </button>
+            <button class="region-btn" data-lat="39.92" data-lon="32.85" data-name="Turkey">
+                <span class="region-flag">🇹🇷</span>
+                <span class="region-name">Turkey</span>
+            </button>
+            <button class="region-btn" data-lat="37.77" data-lon="-122.42" data-name="San Francisco, CA">
+                <span class="region-flag">🌉</span>
+                <span class="region-name">San Francisco</span>
+            </button>
+            <button class="region-btn" data-lat="61.22" data-lon="-149.90" data-name="Alaska">
+                <span class="region-flag">🏔️</span>
+                <span class="region-name">Alaska</span>
+            </button>
+            <button class="region-btn" data-lat="-41.29" data-lon="174.78" data-name="New Zealand">
+                <span class="region-flag">🇳🇿</span>
+                <span class="region-name">New Zealand</span>
+            </button>
+            <button class="region-btn" data-lat="32.43" data-lon="53.69" data-name="Iran">
+                <span class="region-flag">🇮🇷</span>
+                <span class="region-name">Iran</span>
+            </button>
+            <button class="region-btn" data-lat="14.60" data-lon="120.98" data-name="Philippines">
+                <span class="region-flag">🇵🇭</span>
+                <span class="region-name">Philippines</span>
+            </button>
+            <button class="region-btn" data-lat="19.43" data-lon="-99.13" data-name="Mexico City, Mexico">
+                <span class="region-flag">🇲🇽</span>
+                <span class="region-name">Mexico</span>
+            </button>
+            <button class="region-btn" data-lat="28.61" data-lon="77.21" data-name="India">
+                <span class="region-flag">🇮🇳</span>
+                <span class="region-name">India</span>
+            </button>
+            <button class="region-btn" data-lat="46.07" data-lon="14.51" data-name="Europe">
+                <span class="region-flag">🇪🇺</span>
+                <span class="region-name">Europe</span>
+            </button>
+            <button class="region-btn" data-lat="18.48" data-lon="-69.94" data-name="Caribbean">
+                <span class="region-flag">🌴</span>
+                <span class="region-name">Caribbean</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- ===== EARTHQUAKE TRACKER TABLE (EarthquakeTrack-style) ===== -->
+    <section id="earthquake-tracker" class="tracker-section">
+        <div class="tracker-header">
+            <div class="tracker-title-row">
+                <h2 class="section-title">📊 Recent Earthquakes</h2>
+                <div class="tracker-controls">
+                    <div class="tracker-filter-group">
+                        <label>Sort by:</label>
+                        <select id="tableSortBy" class="map-select">
+                            <option value="time">Newest First</option>
+                            <option value="magnitude">Strongest First</option>
+                            <option value="depth">Shallowest First</option>
+                        </select>
+                    </div>
+                    <div class="tracker-filter-group">
+                        <label>Min Magnitude:</label>
+                        <select id="tableMinMag" class="map-select">
+                            <option value="0">All</option>
+                            <option value="2.5">M2.5+</option>
+                            <option value="4.0">M4.0+</option>
+                            <option value="5.0">M5.0+</option>
+                            <option value="6.0">M6.0+</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <p class="section-subtitle" id="trackerSubtitle">All earthquakes M2.5+ in the last 24 hours — data from USGS
+            </p>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="tracker-stats" id="trackerStats">
+            <div class="tstat">
+                <span class="tstat-value" id="tstatTotal">0</span>
+                <span class="tstat-label">Total Events</span>
+            </div>
+            <div class="tstat">
+                <span class="tstat-value tstat-red" id="tstatMajor">0</span>
+                <span class="tstat-label">Major (M6+)</span>
+            </div>
+            <div class="tstat">
+                <span class="tstat-value tstat-orange" id="tstatStrong">0</span>
+                <span class="tstat-label">Strong (M5+)</span>
+            </div>
+            <div class="tstat">
+                <span class="tstat-value tstat-yellow" id="tstatModerate">0</span>
+                <span class="tstat-label">Moderate (M4+)</span>
+            </div>
+            <div class="tstat">
+                <span class="tstat-value tstat-green" id="tstatLight">0</span>
+                <span class="tstat-label">Light (&lt;4)</span>
+            </div>
+        </div>
+
+        <!-- Earthquake Table -->
+        <div class="eq-table-container">
+            <table class="eq-table" id="eqTable">
+                <thead>
+                    <tr>
+                        <th class="eq-th-mag">Mag</th>
+                        <th class="eq-th-location">Location</th>
+                        <th class="eq-th-depth">Depth</th>
+                        <th class="eq-th-time">Time</th>
+                        <th class="eq-th-distance">Distance</th>
+                        <th class="eq-th-action">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="eqTableBody">
+                    <tr>
+                        <td colspan="6" class="eq-loading">
+                            <div class="eq-loading-spinner"></div>
+                            Loading earthquake data from USGS...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="eq-table-footer">
+            <span id="eqTableCount">0 earthquakes shown</span>
+            <span id="eqTableSource">Source: USGS</span>
+            <span id="eqTableUpdated">Updated: —</span>
+        </div>
+        <div class="eq-load-more" id="eqLoadMore" style="display:none;">
+            <button class="btn-load-more" id="loadMoreBtn">Load More Earthquakes</button>
+        </div>
+    </section>
+
+    <!-- ===== LIVE DISASTER FEED (original) ===== -->
+    <section id="live-feed" class="live-feed-section">
+        <div class="feed-header">
+            <div class="feed-title-row">
+                <h2 class="section-title">🔴 Live Disaster Feed</h2>
+                <div class="feed-meta">
+                    <span class="feed-live-dot"></span>
+                    <span id="feedStatus">Loading...</span>
+                    <span class="feed-timestamp" id="feedTimestamp"></span>
+                </div>
+            </div>
+            <p class="section-subtitle">Real-time earthquakes and cyclone activity from USGS and NOAA — auto-refreshes
+                every 60 seconds</p>
+            <!-- Filter buttons -->
+            <div class="feed-filters">
+                <button class="feed-filter-btn active" data-filter="all">🌐 All Events</button>
+                <button class="feed-filter-btn" data-filter="earthquake">🌍 Earthquakes</button>
+                <button class="feed-filter-btn" data-filter="cyclone">🌪️ Cyclones</button>
+            </div>
+        </div>
+        <div class="feed-grid" id="feedGrid">
+            <!-- Loading skeletons -->
+            <div class="feed-skeleton">
+                <div class="skel-bar skel-w80"></div>
+                <div class="skel-bar skel-w60"></div>
+                <div class="skel-bar skel-w40"></div>
+            </div>
+            <div class="feed-skeleton">
+                <div class="skel-bar skel-w80"></div>
+                <div class="skel-bar skel-w60"></div>
+                <div class="skel-bar skel-w40"></div>
+            </div>
+            <div class="feed-skeleton">
+                <div class="skel-bar skel-w80"></div>
+                <div class="skel-bar skel-w60"></div>
+                <div class="skel-bar skel-w40"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features-section">
+        <h2 class="section-title">System Capabilities</h2>
+        <p class="section-subtitle">Comprehensive disaster analysis powered by real-time public data</p>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🌍</div>
+                <h3>Earthquake Analysis</h3>
+                <p>Real-time earthquake detection via USGS API with magnitude, depth, ShakeMap overlays, and MMI
+                    intensity mapping.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🌪️</div>
+                <h3>Cyclone Tracking</h3>
+                <p>Live tropical cyclone monitoring from NOAA NHC with wind radii visualization and storm path tracking.
+                </p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">👥</div>
+                <h3>Population Exposure</h3>
+                <p>Census-based population density estimation within impact zones using WorldPop public data models.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>AI Severity Engine</h3>
+                <p>Automated severity classification, priority assessment, team recommendations, and key concern
+                    identification.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🏥</div>
+                <h3>Resource Mapping</h3>
+                <p>Nearby hospitals, fire stations, and police stations from OpenStreetMap with distance-based search.
+                </p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📰</div>
+                <h3>News Intelligence</h3>
+                <p>Real-time news aggregation from GDELT for situational awareness and ground truth verification.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📦</div>
+                <h3>Resource Allocation</h3>
+                <p>Simulated resource deployment planning based on disaster severity and type for academic
+                    demonstration.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📄</div>
+                <h3>PDF Reports</h3>
+                <p>Download comprehensive analysis reports in PDF format with all disaster data, maps, and
+                    recommendations.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Data Sources Section -->
+    <section id="data-sources" class="sources-section">
+        <h2 class="section-title">Real-Time Data Sources</h2>
+        <p class="section-subtitle">All data sourced from verified, public, and authoritative APIs</p>
+        <div class="sources-grid">
+            <div class="source-card">
+                <div class="source-logo">USGS</div>
+                <div class="source-name">U.S. Geological Survey</div>
+                <div class="source-desc">Earthquake events, ShakeMap, magnitude, depth, and alert levels</div>
+            </div>
+            <div class="source-card">
+                <div class="source-logo">NOAA</div>
+                <div class="source-name">National Hurricane Center</div>
+                <div class="source-desc">Tropical cyclone positions, wind radii, intensity, and forecasts</div>
+            </div>
+            <div class="source-card">
+                <div class="source-logo">GDELT</div>
+                <div class="source-name">Global Database of Events</div>
+                <div class="source-desc">Real-time news articles, ground reports, and situational updates</div>
+            </div>
+            <div class="source-card">
+                <div class="source-logo">OSM</div>
+                <div class="source-name">OpenStreetMap</div>
+                <div class="source-desc">Emergency facilities, infrastructure, and geocoding services</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Ethics Section -->
+    <section id="ethics" class="ethics-section">
+        <div class="ethics-card">
+            <div class="ethics-icon">🛡️</div>
+            <h2>Ethical Boundaries</h2>
+            <div class="ethics-grid">
+                <div class="ethics-item">
+                    <span class="ethics-check">✅</span>
+                    <span>Uses only public, open-source data from government APIs</span>
+                </div>
+                <div class="ethics-item">
+                    <span class="ethics-check">✅</span>
+                    <span>Population estimates from census-based density models (WorldPop)</span>
+                </div>
+                <div class="ethics-item">
+                    <span class="ethics-check">❌</span>
+                    <span>No mobile tracking, telecom data, or individual-level analysis</span>
+                </div>
+                <div class="ethics-item">
+                    <span class="ethics-check">❌</span>
+                    <span>No private surveillance or personally identifiable information</span>
+                </div>
+                <div class="ethics-item">
+                    <span class="ethics-check">⚠️</span>
+                    <span>Resource allocation is simulated for academic demonstration only</span>
+                </div>
+                <div class="ethics-item">
+                    <span class="ethics-check">⚠️</span>
+                    <span>Not a certified emergency tool — decisions must be made by trained responders</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <h2>Ready to Analyze?</h2>
+        <p>Launch the real-time disaster analysis dashboard</p>
+        <a href="/login" class="btn-launch btn-launch-lg">
+            <span class="btn-icon">🚀</span>
+            Launch Dashboard
+        </a>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>⚠️ <strong>ACADEMIC PROTOTYPE</strong> — PDRDSS provides AI-assisted decision support for research purposes
+            only.</p>
+        <p class="footer-sub">Built with FastAPI · Leaflet.js · USGS · NOAA · GDELT · OpenStreetMap</p>
+    </footer>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Landing Page JS -->
+    <script src="/static/js/landing.js"></script>
+
+</body>
+
+</html>

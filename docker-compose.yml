@@ -1,0 +1,13 @@
+
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./disaster.db:/app/disaster.db
+    environment:
+      - SECRET_KEY=your-secret-key-keep-it-secret
+    restart: always
