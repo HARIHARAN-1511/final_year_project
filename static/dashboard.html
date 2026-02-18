@@ -24,6 +24,14 @@
 
 <body>
 
+    <!-- Redirect to landing page on browser refresh (only if no analysis params) -->
+    <script>
+        const navEntry = performance.getEntriesByType("navigation")[0];
+        if (navEntry && navEntry.type === "reload" && !window.location.search) {
+            window.location.replace("/");
+        }
+    </script>
+
     <!-- ===== TOP STATUS BAR ===== -->
     <header id="topBar" class="top-bar">
         <div class="top-bar-left">
@@ -227,6 +235,42 @@
                 </div>
                 <div class="panel-body" id="panelAllocationBody">
                     <div class="empty-state">Resource allocation will appear after analysis</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ENRICHED DATA PANELS -->
+        <div class="decision-grid" style="margin-top:0;">
+            <!-- Nearby Cities -->
+            <div class="panel" id="panelCities">
+                <div class="panel-header">
+                    <h3>🏙️ Nearby Cities & Towns</h3>
+                    <span class="freshness-badge" id="freshCities">⚪ USGS</span>
+                </div>
+                <div class="panel-body" id="panelCitiesBody">
+                    <div class="empty-state">Nearby cities will appear after analysis</div>
+                </div>
+            </div>
+
+            <!-- Weather Conditions -->
+            <div class="panel" id="panelWeather">
+                <div class="panel-header">
+                    <h3>🌡️ Current Weather at Location</h3>
+                    <span class="freshness-badge" id="freshWeather">⚪ Open-Meteo</span>
+                </div>
+                <div class="panel-body" id="panelWeatherBody">
+                    <div class="empty-state">Weather data will appear after analysis</div>
+                </div>
+            </div>
+
+            <!-- Recent Seismic Activity -->
+            <div class="panel" id="panelRecentEvents" style="grid-column: 1 / -1;">
+                <div class="panel-header">
+                    <h3>📈 Recent Seismic Activity in Region</h3>
+                    <span class="freshness-badge" id="freshEvents">⚪ USGS</span>
+                </div>
+                <div class="panel-body" id="panelRecentEventsBody" style="max-height:350px;overflow-y:auto;">
+                    <div class="empty-state">Earthquake events will appear after analysis</div>
                 </div>
             </div>
         </div>

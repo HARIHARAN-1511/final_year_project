@@ -345,6 +345,9 @@ function renderAnalysis(data) {
     renderConcerns(data);
     renderResources(data);
     renderAllocatedResources(data);
+    renderNearbyCities(data);
+    renderWeather(data);
+    renderRecentEvents(data);
     renderNews(data);
     updateFreshnessBadges(data);
 }
@@ -444,7 +447,6 @@ function renderEpicenter(data) {
     const mag = info.magnitude || 0;
 
     // Geographic radius in meters — scales with magnitude
-    // M3 ≈ 5km, M5 ≈ 20km, M7 ≈ 80km, M9 ≈ 200km
     const baseRadius = Math.pow(10, mag * 0.4) * 500;
 
     // Outer impact zone (minor damage / felt area)
@@ -468,15 +470,53 @@ function renderEpicenter(data) {
         weight: 2.5, opacity: 0.7,
     }).bindPopup(`<div class="popup-title">🔴 Severe Impact Zone</div><div class="popup-detail">Radius: ${(baseRadius / 1000).toFixed(1)} km</div>`));
 
-    // Epicenter pin (small fixed marker for the exact point)
+    // Distance rings: 10km, 50km, 100km
+    [10, 50, 100].forEach(r => {
+        state.layers.damage.addLayer(L.circle([lat, lon], {
+            radius: r * 1000, color: '#64748b', fillOpacity: 0, weight: 1, opacity: 0.4, dashArray: '4,8',
+        }).bindTooltip(`${r} km`, { permanent: true, direction: 'right', className: 'distance-label' }));
+    });
+
+    // Pulsing epicenter marker
     const epicenterIcon = L.divIcon({
-        html: `<div style="font-size:1.6rem;text-align:center;filter:drop-shadow(0 2px 6px rgba(220,38,38,0.8));">⭐</div>`,
-        className: 'epicenter-marker', iconSize: [30, 30], iconAnchor: [15, 15],
+        html: `<div class="epicenter-pulse"><div class="pulse-ring"></div><div class="pulse-dot">⭐</div></div>`,
+        className: 'epicenter-marker-wrapper', iconSize: [40, 40], iconAnchor: [20, 20],
     });
     state.layers.damage.addLayer(
         L.marker([lat, lon], { icon: epicenterIcon })
-            .bindPopup(`<div class="popup-title">⭐ Epicenter — M${mag}</div><div class="popup-detail">${info.where || 'Unknown'}</div><div class="popup-detail">Depth: ${info.depth_km ? info.depth_km.toFixed(1) + ' km' : '—'}</div>`)
+            .bindPopup(`<div class="popup-title">⭐ Epicenter — M${mag}</div><div class="popup-detail">${info.where || 'Unknown'}</div><div class="popup-detail">Depth: ${info.depth_km ? info.depth_km.toFixed(1) + ' km' : '—'}</div><div class="popup-detail">Felt: ${info.felt ? info.felt.toLocaleString() + ' reports' : 'N/A'}</div>`)
     );
+
+    // Plot ALL recent earthquake events as circle markers
+    if (data.recent_events && data.recent_events.length > 1) {
+        data.recent_events.slice(1).forEach(ev => {
+            if (!ev.lat || !ev.lon) return;
+            const m = ev.magnitude || 0;
+            const r = Math.max(3, m * 2.5) * 1000; // radius in meters
+            const col = getMagColor(m);
+            state.layers.damage.addLayer(
+                L.circleMarker([ev.lat, ev.lon], {
+                    radius: Math.max(4, m * 1.8), color: col, fillColor: col,
+                    fillOpacity: 0.6, weight: 1.5, opacity: 0.8,
+                }).bindPopup(`<div class="popup-title">M${m.toFixed(1)}</div><div class="popup-detail">${ev.place || 'Unknown'}</div><div class="popup-detail">Depth: ${ev.depth_km ? ev.depth_km.toFixed(1) + ' km' : '—'}</div><div class="popup-detail">${ev.time ? new Date(ev.time).toLocaleString() : ''}</div>`)
+            );
+        });
+    }
+
+    // Plot nearby cities as labeled markers
+    if (data.nearby_cities && data.nearby_cities.length > 0) {
+        data.nearby_cities.forEach(city => {
+            if (!city.latitude || !city.longitude) return;
+            const cityIcon = L.divIcon({
+                html: `<div style="font-size:0.7rem;color:#f8fafc;background:#334155;padding:2px 6px;border-radius:4px;white-space:nowrap;border:1px solid #64748b;font-weight:600;">${city.name || 'City'}</div>`,
+                className: 'city-label-marker', iconSize: [80, 20], iconAnchor: [40, 10],
+            });
+            state.layers.damage.addLayer(
+                L.marker([city.latitude, city.longitude], { icon: cityIcon })
+                    .bindPopup(`<div class="popup-title">🏙️ ${city.name}</div><div class="popup-detail">${city.distance} km ${city.direction} of epicenter</div>${city.population ? `<div class="popup-detail">Pop: ${city.population.toLocaleString()}</div>` : ''}`)
+            );
+        });
+    }
 }
 
 function renderResourceMarkers(resources) {
@@ -529,36 +569,62 @@ function renderDisasterInfo(data) {
         const dist = info.distance_km !== undefined ? info.distance_km : '—';
         const ago = info.time_ago ? timeAgo(info.time_ago) : '';
         const userLoc = data.location || 'Search Location';
+        const sigPct = Math.min(100, Math.round((info.significance || 0) / 10));
 
         html = `
-            <div style="text-align:center; margin-bottom:1.5rem; padding-bottom:1.5rem; border-bottom:1px solid #e5e7eb;">
-                <div style="font-size:1.5rem; font-weight:800; color:#1e293b; line-height:1.2; margin-bottom:0.5rem;">
+            <div style="text-align:center; margin-bottom:1.2rem; padding-bottom:1.2rem; border-bottom:1px solid #e5e7eb;">
+                <div style="font-size:1.6rem; font-weight:800; color:#1e293b; line-height:1.2; margin-bottom:0.4rem;">
                     <span style="color:${getMagColor(info.magnitude)};">M${info.magnitude}</span> Earthquake
                 </div>
-                <div style="font-size:1.1rem; color:#4b5563; margin-bottom:0.25rem;">
+                <div style="font-size:1.05rem; color:#4b5563; margin-bottom:0.2rem;">
                     <strong>${dist} km</strong> from <span style="text-decoration:underline; text-decoration-color:#9ca3af;">${userLoc}</span>
                 </div>
-                <div style="font-size:0.95rem; color:#6b7280; font-weight:500;">
-                    ${ago}
-                </div>
+                <div style="font-size:0.9rem; color:#6b7280; font-weight:500;">${ago}</div>
+                ${info.event_url ? `<a href="https://earthquake.usgs.gov${info.event_url}" target="_blank" rel="noopener" style="font-size:0.8rem;color:#3b82f6;text-decoration:none;font-weight:600;">🔗 View on USGS →</a>` : ''}
             </div>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:1rem;">
-                <div class="info-row" style="flex-direction:column; align-items:flex-start; gap:0.25rem;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem; margin-bottom:1rem;">
+                <div class="info-row" style="flex-direction:column; align-items:flex-start; gap:0.2rem;">
                     <span class="info-row-label">UTC Time</span>
-                    <span class="info-row-value mono" style="font-size:0.9rem;">${info.when ? new Date(info.when).toUTCString().replace('GMT', '').trim() : '—'}</span>
+                    <span class="info-row-value mono" style="font-size:0.85rem;">${info.when ? new Date(info.when).toUTCString().replace('GMT', '').trim() : '—'}</span>
                 </div>
-                <div class="info-row" style="flex-direction:column; align-items:flex-start; gap:0.25rem;">
-                    <span class="info-row-label">Your Time</span>
-                    <span class="info-row-value mono" style="font-size:0.9rem;">${info.when ? new Date(info.when).toLocaleString() : '—'}</span>
+                <div class="info-row" style="flex-direction:column; align-items:flex-start; gap:0.2rem;">
+                    <span class="info-row-label">Local Time</span>
+                    <span class="info-row-value mono" style="font-size:0.85rem;">${info.when ? new Date(info.when).toLocaleString() : '—'}</span>
                 </div>
             </div>
 
-            <div class="info-row"><span class="info-row-label">Depth</span><span class="info-row-value mono">${info.depth_km ? info.depth_km.toFixed(1) + ' km' : '—'}</span></div>
             <div class="info-row"><span class="info-row-label">Epicenter</span><span class="info-row-value" style="font-size:0.9rem;">${info.where || '—'}</span></div>
-            <div class="info-row"><span class="info-row-label">Max MMI</span><span class="info-row-value mono">${info.mmi ? info.mmi.toFixed(1) : '—'}</span></div>
-            <div class="info-row"><span class="info-row-label">Alert</span><span class="info-row-value">${info.alert_level ? alertBadge(info.alert_level) : '—'}</span></div>
-            <div class="info-row"><span class="info-row-label">Felt Reports</span><span class="info-row-value mono">${info.felt || '0'}</span></div>
+            <div class="info-row"><span class="info-row-label">Depth</span><span class="info-row-value mono">${info.depth_km ? info.depth_km.toFixed(1) + ' km' : '—'} <span style="color:#94a3b8;font-size:0.8rem;">${info.depth_class || ''}</span></span></div>
+            <div class="info-row"><span class="info-row-label">Intensity (MMI)</span><span class="info-row-value mono">${info.mmi ? info.mmi.toFixed(1) : '—'} <span style="font-weight:700; color:${getMagColor(info.mmi || 0)};">${info.mmi_description || ''}</span></span></div>
+            <div class="info-row"><span class="info-row-label">PAGER Alert</span><span class="info-row-value">${info.alert_level ? alertBadge(info.alert_level) : '—'}</span></div>
+            <div class="info-row"><span class="info-row-label">Felt Reports</span><span class="info-row-value mono" style="font-weight:700;">${info.felt ? info.felt.toLocaleString() : '0'}</span></div>
+            <div class="info-row"><span class="info-row-label">Tsunami</span><span class="info-row-value">${info.tsunami ? '<span style="color:#dc2626;font-weight:700;">⚠ WARNING</span>' : '<span style="color:#22c55e;">None</span>'}</span></div>
+            <div class="info-row"><span class="info-row-label">Events in Region</span><span class="info-row-value mono" style="font-weight:700;">${info.total_events || 0}</span></div>
+            <div class="info-row"><span class="info-row-label">Severity</span><span class="info-row-value">${severityBadge(data.severity)}</span></div>
+            <div class="info-row"><span class="info-row-label">Status</span><span class="info-row-value">${info.status || '—'}</span></div>
+
+            <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid #e5e7eb;">
+                <div style="font-size:0.8rem; color:#64748b; font-weight:600; margin-bottom:0.4rem;">SIGNIFICANCE SCORE</div>
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <div style="flex:1; background:#e2e8f0; border-radius:6px; height:10px; overflow:hidden;">
+                        <div style="width:${sigPct}%; height:100%; background: linear-gradient(90deg, #22c55e, #eab308, #ef4444); border-radius:6px; transition:width 0.6s;"></div>
+                    </div>
+                    <span class="mono" style="font-weight:700; font-size:0.9rem; color:#1e293b;">${info.significance || 0}</span>
+                </div>
+            </div>
+
+            ${data.tectonic_summary ? `
+            <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid #e5e7eb;">
+                <div style="font-size:0.8rem; color:#64748b; font-weight:600; margin-bottom:0.4rem;">🌍 TECTONIC CONTEXT</div>
+                <div style="font-size:0.85rem; color:#475569; line-height:1.5;">${data.tectonic_summary.substring(0, 500)}${data.tectonic_summary.length > 500 ? '...' : ''}</div>
+            </div>` : ''}
+
+            ${data.pager_data ? `
+            <div style="margin-top:1rem; padding:0.75rem; background:#fef2f2; border-radius:8px; border-left:3px solid ${data.pager_data.alert_level === 'red' ? '#dc2626' : data.pager_data.alert_level === 'orange' ? '#f97316' : data.pager_data.alert_level === 'yellow' ? '#eab308' : '#22c55e'};">
+                <div style="font-size:0.8rem; color:#64748b; font-weight:600; margin-bottom:0.3rem;">🚨 PAGER ALERT: ${(data.pager_data.alert_level || '').toUpperCase()}</div>
+                <div style="font-size:0.85rem; color:#374151;">Max MMI: ${data.pager_data.max_mmi || '—'}</div>
+            </div>` : ''}
         `;
     } else {
         html = `
@@ -581,6 +647,22 @@ function renderPopulationExposure(data) {
         return;
     }
     const confColor = pop.confidence === 'High' ? 'var(--color-low)' : pop.confidence === 'Medium' ? 'var(--color-medium)' : 'var(--color-high)';
+
+    // Multi-zone breakdown
+    let zonesHtml = '';
+    if (data.population_zones && data.population_zones.length > 0) {
+        zonesHtml = `<div style="margin-top:0.75rem; border-top:1px solid #e5e7eb; padding-top:0.75rem;">
+            <div style="font-size:0.8rem; color:#64748b; font-weight:600; margin-bottom:0.5rem;">IMPACT ZONE BREAKDOWN</div>
+            ${data.population_zones.map(z => `
+                <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+                    <div style="width:12px;height:12px;border-radius:50%;background:${z.color};flex-shrink:0;"></div>
+                    <span style="flex:1;font-size:0.85rem;color:#374151;">${z.name} (${z.radius_km} km)</span>
+                    <span class="mono" style="font-weight:700;font-size:0.85rem;">${z.population.toLocaleString()}</span>
+                </div>
+            `).join('')}
+        </div>`;
+    }
+
     body.innerHTML = `
         <div class="pop-exposure-card">
             <div class="pop-main">
@@ -591,6 +673,7 @@ function renderPopulationExposure(data) {
             <div class="info-row"><span class="info-row-label">Density</span><span class="info-row-value mono">${pop.density_per_km2} /km²</span></div>
             <div class="info-row"><span class="info-row-label">Data Source</span><span class="info-row-value">${pop.data_source}</span></div>
             <div class="info-row"><span class="info-row-label">Confidence</span><span class="info-row-value" style="color:${confColor};font-weight:700;">${pop.confidence}</span></div>
+            ${zonesHtml}
             <div class="pop-disclaimer">${pop.disclaimer}</div>
         </div>`;
 }
@@ -657,6 +740,110 @@ function renderAllocatedResources(data) {
             <span class="alloc-icon">${i.icon}</span>
             <div class="alloc-detail"><div class="alloc-name">${i.name}</div><div class="alloc-qty">${i.quantity} ${i.unit}</div></div>
         </div>`).join('')}</div><div class="alloc-disclaimer">🎓 ${alloc.disclaimer}</div>`;
+}
+
+// --- Nearby Cities Panel ---
+function renderNearbyCities(data) {
+    const body = document.getElementById('panelCitiesBody');
+    if (!body) return;
+    const cities = data.nearby_cities;
+    if (!cities || cities.length === 0) {
+        body.innerHTML = '<div class="empty-state-enhanced"><span class="empty-icon">🏙️</span><span>No nearby city data available</span></div>';
+        return;
+    }
+    const dirEmoji = (d) => {
+        const map = { N: '⬆️', S: '⬇️', E: '➡️', W: '⬅️', NE: '↗️', NW: '↖️', SE: '↘️', SW: '↙️', NNE: '↗️', NNW: '↖️', SSE: '↘️', SSW: '↙️', ENE: '↗️', ESE: '↘️', WNW: '↖️', WSW: '↙️' };
+        return map[d] || '📍';
+    };
+    body.innerHTML = cities.map(c => `
+        <div style="display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0;border-bottom:1px solid #f1f5f9;">
+            <span style="font-size:1.1rem;">${dirEmoji(c.direction)}</span>
+            <div style="flex:1;">
+                <div style="font-weight:600;font-size:0.9rem;color:#1e293b;">${c.name || 'Unknown'}</div>
+                ${c.population ? `<div style="font-size:0.75rem;color:#94a3b8;">Pop: ${c.population.toLocaleString()}</div>` : ''}
+            </div>
+            <div style="text-align:right;">
+                <div class="mono" style="font-weight:700;font-size:0.85rem;color:#334155;">${c.distance} km</div>
+                <div style="font-size:0.75rem;color:#94a3b8;">${c.direction}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// --- Weather Panel ---
+function renderWeather(data) {
+    const body = document.getElementById('panelWeatherBody');
+    if (!body) return;
+    const w = data.weather;
+    if (!w || !w.available) {
+        body.innerHTML = '<div class="empty-state-enhanced"><span class="empty-icon">🌡️</span><span>Weather data unavailable</span></div>';
+        return;
+    }
+    const weatherIcon = w.is_day ?
+        (w.weather_code <= 1 ? '☀️' : w.weather_code <= 3 ? '⛅' : w.weather_code <= 48 ? '🌫️' : w.weather_code <= 65 ? '🌧️' : w.weather_code <= 77 ? '❄️' : w.weather_code <= 82 ? '🌧️' : '⛈️') :
+        (w.weather_code <= 1 ? '🌙' : w.weather_code <= 3 ? '☁️' : '🌧️');
+    const tempF = w.temperature_c !== null ? Math.round(w.temperature_c * 9 / 5 + 32) : null;
+
+    body.innerHTML = `
+        <div style="text-align:center;margin-bottom:1rem;">
+            <div style="font-size:2.5rem;">${weatherIcon}</div>
+            <div style="font-size:1.3rem;font-weight:800;color:#1e293b;">${w.temperature_c !== null ? w.temperature_c + '°C' : '—'}</div>
+            ${tempF !== null ? `<div style="font-size:0.85rem;color:#64748b;">${tempF}°F</div>` : ''}
+            <div style="font-size:0.9rem;color:#475569;font-weight:600;">${w.weather_desc || 'Unknown'}</div>
+        </div>
+        <div class="info-row"><span class="info-row-label">💨 Wind</span><span class="info-row-value mono">${w.windspeed_kmh || '—'} km/h (${w.wind_direction || '—'}°)</span></div>
+        <div class="info-row"><span class="info-row-label">💧 Humidity</span><span class="info-row-value mono">${w.humidity_pct !== null ? w.humidity_pct + '%' : '—'}</span></div>
+        <div class="info-row"><span class="info-row-label">👁️ Visibility</span><span class="info-row-value mono">${w.visibility_m !== null ? (w.visibility_m / 1000).toFixed(1) + ' km' : '—'}</span></div>
+        <div style="margin-top:0.5rem;font-size:0.7rem;color:#94a3b8;text-align:right;">Source: ${w.source || 'Open-Meteo'}</div>
+    `;
+}
+
+// --- Recent Events Panel ---
+function renderRecentEvents(data) {
+    const body = document.getElementById('panelRecentEventsBody');
+    if (!body) return;
+    const events = data.recent_events;
+    if (!events || events.length === 0) {
+        body.innerHTML = '<div class="empty-state-enhanced"><span class="empty-icon">📈</span><span>No seismic events detected</span></div>';
+        return;
+    }
+    const timeAgo = (iso) => {
+        if (!iso) return '';
+        const sec = (Date.now() - new Date(iso).getTime()) / 1000;
+        if (sec < 60) return 'Just now';
+        if (sec < 3600) return Math.floor(sec / 60) + 'm ago';
+        if (sec < 86400) return Math.floor(sec / 3600) + 'h ago';
+        return Math.floor(sec / 86400) + 'd ago';
+    };
+    body.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+            <thead>
+                <tr style="background:#f8fafc;color:#64748b;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.5px;">
+                    <th style="padding:0.5rem;text-align:left;">Mag</th>
+                    <th style="padding:0.5rem;text-align:left;">Location</th>
+                    <th style="padding:0.5rem;text-align:right;">Depth</th>
+                    <th style="padding:0.5rem;text-align:right;">Time</th>
+                    <th style="padding:0.5rem;text-align:right;">Felt</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${events.map((ev, i) => `
+                    <tr style="border-bottom:1px solid #f1f5f9;${i === 0 ? 'background:#fffbeb;font-weight:600;' : ''}">
+                        <td style="padding:0.4rem 0.5rem;">
+                            <span style="display:inline-block;padding:2px 8px;border-radius:4px;background:${getMagColor(ev.magnitude)};color:#fff;font-weight:700;font-size:0.8rem;min-width:40px;text-align:center;">
+                                M${(ev.magnitude || 0).toFixed(1)}
+                            </span>
+                        </td>
+                        <td style="padding:0.4rem 0.5rem;color:#334155;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${ev.place || ''}">${ev.place || 'Unknown'}</td>
+                        <td style="padding:0.4rem 0.5rem;text-align:right;color:#64748b;" class="mono">${ev.depth_km ? ev.depth_km.toFixed(1) + ' km' : '—'}</td>
+                        <td style="padding:0.4rem 0.5rem;text-align:right;color:#64748b;" title="${ev.time ? new Date(ev.time).toLocaleString() : ''}">${timeAgo(ev.time)}</td>
+                        <td style="padding:0.4rem 0.5rem;text-align:right;color:#64748b;" class="mono">${ev.felt || '—'}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+        <div style="font-size:0.75rem;color:#94a3b8;text-align:right;margin-top:0.5rem;">Showing ${events.length} events • Source: USGS</div>
+    `;
 }
 
 // --- News Panel ---

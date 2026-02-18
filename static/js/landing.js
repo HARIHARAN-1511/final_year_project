@@ -6,14 +6,12 @@
 let allEarthquakes = [];       // full USGS data
 let filteredEarthquakes = [];  // after table filters
 let displayedCount = 0;
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 10;
 let eqMap = null;
 let markerLayer = null;
 let searchMarker = null;
 let userLat = null;
 let userLon = null;
-let allFeedEvents = [];
-let currentFeedFilter = 'all';
 
 // USGS feed URLs
 const USGS_FEEDS = {
@@ -54,10 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initMap();
     loadMapEarthquakes();
     loadAllStats();
-    loadFeed();
 
     setInterval(loadMapEarthquakes, 120000);   // refresh map every 2 min
-    setInterval(loadFeed, 60000);               // refresh feed every 1 min
 
     // Search
     document.getElementById('searchBtn').addEventListener('click', doSearch);
@@ -91,15 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Feed filters
-    document.querySelectorAll('.feed-filter-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.feed-filter-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentFeedFilter = btn.dataset.filter;
-            renderFeed();
-        });
-    });
+
 });
 
 // ============================================================
@@ -464,89 +452,7 @@ function updateTrackerStats(eqs) {
     document.getElementById('tstatLight').textContent = eqs.filter(e => (e.magnitude || 0) < 4.0).length;
 }
 
-// ============================================================
-// LIVE FEED (original PDRDSS feed)
-// ============================================================
-async function loadFeed() {
-    try {
-        const resp = await fetch('/api/live-feed');
-        if (!resp.ok) throw new Error('Feed fetch failed');
-        const data = await resp.json();
-        allFeedEvents = data.events || [];
 
-        document.getElementById('feedStatus').textContent = `${data.total} events tracked`;
-        document.getElementById('feedTimestamp').textContent =
-            'Updated ' + new Date(data.timestamp).toLocaleTimeString('en-US', {
-                hour: '2-digit', minute: '2-digit', hour12: true
-            });
-
-        renderFeed();
-    } catch (err) {
-        console.error('Feed error:', err);
-        document.getElementById('feedStatus').textContent = 'Connection error — retrying...';
-    }
-}
-
-function renderFeed() {
-    const grid = document.getElementById('feedGrid');
-    const filtered = currentFeedFilter === 'all'
-        ? allFeedEvents
-        : allFeedEvents.filter(e => e.type === currentFeedFilter);
-
-    if (filtered.length === 0) {
-        grid.innerHTML = `<div class="feed-empty">No ${currentFeedFilter === 'all' ? '' : currentFeedFilter + ' '}events detected in the last 24 hours</div>`;
-        return;
-    }
-
-    grid.innerHTML = filtered.map(ev => {
-        const isEq = ev.type === 'earthquake';
-        const icon = isEq ? '🌍' : '🌪️';
-        const typeLabel = isEq ? 'Earthquake' : 'Cyclone';
-        const severity = getSeverityClass(ev);
-        const timeAgo = getTimeAgo(ev.time);
-        const magDisplay = isEq && ev.magnitude
-            ? `<span class="feed-mag ${severity}">M${ev.magnitude}</span>`
-            : ev.intensity
-                ? `<span class="feed-mag cyclone-int">${ev.intensity} kt</span>`
-                : '';
-
-        const canNavigate = ev.lat != null && ev.lon != null;
-
-        return `
-        <div class="feed-card ${severity}-border ${canNavigate ? 'feed-card-clickable' : ''}" 
-             ${canNavigate ? `onclick="navigateToDashboard(${ev.lat}, ${ev.lon}, '${ev.type}', '${esc(ev.location)}')"` : ''}
-             title="${canNavigate ? 'Click to analyze in dashboard' : ''}">
-            <div class="feed-card-top">
-                <span class="feed-type-icon">${icon}</span>
-                <span class="feed-type-label ${isEq ? 'eq-label' : 'cy-label'}">${typeLabel}</span>
-                ${magDisplay}
-                <span class="feed-time">${timeAgo}</span>
-            </div>
-            <div class="feed-card-title">${esc(ev.title)}</div>
-            <div class="feed-card-location">📍 ${esc(ev.location)}</div>
-            <div class="feed-card-details">
-                <span class="feed-coord">${ev.lat != null ? ev.lat.toFixed(4) : '—'}, ${ev.lon != null ? ev.lon.toFixed(4) : '—'}</span>
-                ${ev.depth_km != null ? `<span class="feed-detail">Depth: ${ev.depth_km} km</span>` : ''}
-                ${ev.tsunami ? '<span class="feed-tsunami">⚠ Tsunami</span>' : ''}
-                ${ev.felt ? `<span class="feed-detail">Felt: ${ev.felt}</span>` : ''}
-                <span class="feed-source">${ev.source}</span>
-            </div>
-            ${ev.time ? `<div class="feed-card-date">${new Date(ev.time).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })} UTC</div>` : ''}
-            ${canNavigate ? '<div class="feed-card-action">🔍 Click to Analyze</div>' : ''}
-        </div>`;
-    }).join('');
-}
-
-function getSeverityClass(ev) {
-    if (ev.type === 'earthquake') {
-        const m = ev.magnitude || 0;
-        if (m >= 7) return 'sev-catastrophic';
-        if (m >= 5.5) return 'sev-severe';
-        if (m >= 4.0) return 'sev-moderate';
-        return 'sev-minor';
-    }
-    return 'sev-cyclone';
-}
 
 // ============================================================
 // UTILITIES

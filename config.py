@@ -2,7 +2,7 @@
 # Post-Disaster Rescue Decision Support System (PDRDSS)
 # Configuration and Constants
 
-HTTP_TIMEOUT = 10.0  # seconds per external API call
+HTTP_TIMEOUT = 20.0  # seconds per external API call (USGS query can take 15s+)
 CACHE_TTL = 300      # seconds for server-side cache
 
 # ---------------------------------------------------------------------------

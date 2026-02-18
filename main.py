@@ -15,8 +15,18 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from routes import router as api_router
+from database import engine, Base
+import models  # Ensure all models are registered with Base
 
 app = FastAPI(title="PDRDSS", version="2.0.0")
+
+# ---------------------------------------------------------------------------
+# Create DB tables on startup
+# ---------------------------------------------------------------------------
+@app.on_event("startup")
+async def on_startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 # Allow CORS for development convenience (though serving static files from same origin)
 app.add_middleware(

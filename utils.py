@@ -1,9 +1,12 @@
 
 import math
 import time
+import logging
 import httpx
 from typing import Optional
 from config import HTTP_TIMEOUT, CACHE_TTL
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Server-side TTL cache
@@ -35,7 +38,8 @@ async def fetch_json(client: httpx.AsyncClient, url: str, params: Optional[dict]
         data = resp.json()
         cache_set(cache_key, data)
         return data
-    except Exception:
+    except Exception as e:
+        logger.warning(f"fetch_json FAILED: {url} — {type(e).__name__}: {e}")
         return None
 
 async def fetch_text(client: httpx.AsyncClient, url: str, params: Optional[dict] = None):
@@ -44,7 +48,8 @@ async def fetch_text(client: httpx.AsyncClient, url: str, params: Optional[dict]
         resp = await client.get(url, params=params, timeout=HTTP_TIMEOUT)
         resp.raise_for_status()
         return resp.text
-    except Exception:
+    except Exception as e:
+        logger.warning(f"fetch_text FAILED: {url} — {type(e).__name__}: {e}")
         return None
 
 

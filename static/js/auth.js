@@ -16,7 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (response.ok) {
                     const data = await response.json();
                     localStorage.setItem('access_token', data.access_token);
-                    window.location.href = '/dashboard'; // Redirect to dashboard
+                    // Redirect to saved return URL or dashboard
+                    const returnUrl = sessionStorage.getItem('returnUrl') || '/dashboard';
+                    sessionStorage.removeItem('returnUrl');
+                    window.location.href = returnUrl;
                 } else {
                     errorMsg.style.display = 'block';
                 }
@@ -38,6 +41,8 @@ function getAuthHeaders() {
 // Redirect if not logged in (call this on protected pages)
 function requireAuth() {
     if (!localStorage.getItem('access_token')) {
+        // Save the full current URL so we can return after login
+        sessionStorage.setItem('returnUrl', window.location.href);
         window.location.href = '/login';
     }
 }

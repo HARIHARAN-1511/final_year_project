@@ -240,7 +240,7 @@ async def fetch_earthquakes(lat: float, lon: float, radius_km: float, days: int,
             "format": "geojson", "latitude": lat, "longitude": lon,
             "maxradiuskm": radius_km, "starttime": start.isoformat(),
             "endtime": end.isoformat(), "minmagnitude": min_mag,
-            "orderby": "magnitude", "limit": 20,
+            "orderby": "magnitude", "limit": 50,
         })
     
     ts = datetime.now(timezone.utc).isoformat()
@@ -250,29 +250,31 @@ async def fetch_earthquakes(lat: float, lon: float, radius_km: float, days: int,
         async with SessionLocal() as db:
             result = await db.execute(select(DisasterCache).where(DisasterCache.type == "earthquake"))
             cached_rows = result.scalars().all()
-            
             features = []
             for row in cached_rows:
-                # Basic spatial filter (Haversine)
                 d = haversine(lat, lon, row.lat, row.lon)
                 if d <= radius_km:
-                    # Check age? Logic: return what we have if API fails.
                     features.append(row.data_json)
-            
             if features:
                 data = {"features": features}
-                # Sort by mag descending?
-                # data["features"].sort(key=lambda x: x["properties"]["mag"], reverse=True)
 
     if not data or not data.get("features"):
-        return {"events": [], "count": 0, "message": f"No significant events within {int(radius_km)}km.", "source": "USGS (Offline)", "timestamp": ts, "shakemap": None}
+        return {
+            "events": [], "count": 0, "message": f"No significant events within {int(radius_km)}km.",
+            "source": "USGS (Offline)", "timestamp": ts, "shakemap": None,
+            "nearby_cities": [], "pager_data": None, "tectonic_summary": None,
+        }
 
     events = []
     shakemap_geojson = None
+    nearby_cities = []
+    pager_data = None
+    tectonic_summary = None
+    
     for f in data["features"]:
         props = f["properties"]
         coords = f["geometry"]["coordinates"]
-        events.append({
+        ev = {
             "id": f.get("id"),
             "magnitude": props.get("mag"),
             "place": props.get("place", ""),
@@ -284,28 +286,129 @@ async def fetch_earthquakes(lat: float, lon: float, radius_km: float, days: int,
             "alert": props.get("alert"),
             "mmi": props.get("mmi"),
             "detail_url": props.get("detail"),
-        })
+            "significance": props.get("sig", 0),
+            "event_type": props.get("type", "earthquake"),
+            "status": props.get("status", ""),
+            "url": props.get("url", ""),
+        }
+        events.append(ev)
 
-    # Try ShakeMap
+    # Fetch rich detail for the strongest event from USGS detail API
     if events and events[0].get("detail_url"):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=15) as client:
             try:
                 detail = await fetch_json(client, events[0]["detail_url"])
                 if detail:
-                    sm_prods = detail.get("properties", {}).get("products", {}).get("shakemap", [])
+                    products = detail.get("properties", {}).get("products", {})
+                    
+                    # --- ShakeMap ---
+                    sm_prods = products.get("shakemap", [])
                     if sm_prods:
-                        # Logic to get geojson...
                         contents = sm_prods[0].get("contents", {})
                         for key in ["download/cont_mi.json", "download/cont_mmi.json"]:
                             if key in contents:
                                 shakemap_geojson = await fetch_json(client, contents[key]["url"])
                                 break
+                    
+                    # --- Nearby Cities ---
+                    nc_prods = products.get("nearby-cities", [])
+                    if nc_prods:
+                        nc_contents = nc_prods[0].get("contents", {})
+                        if "nearby-cities.json" in nc_contents:
+                            nc_data = await fetch_json(client, nc_contents["nearby-cities.json"]["url"])
+                            if nc_data and isinstance(nc_data, list):
+                                nearby_cities = nc_data[:10]
+                    
+                    # --- PAGER (Loss estimates) ---
+                    lp_prods = products.get("losspager", [])
+                    if lp_prods:
+                        lp = lp_prods[0]
+                        lp_props = lp.get("properties", {})
+                        pager_data = {
+                            "alert_level": lp_props.get("alertlevel", ""),
+                            "max_mmi": lp_props.get("maxmmi", ""),
+                        }
+                        # Try to get exposure data
+                        lp_contents = lp.get("contents", {})
+                        if "json/exposures.json" in lp_contents:
+                            try:
+                                exp_data = await fetch_json(client, lp_contents["json/exposures.json"]["url"])
+                                if exp_data:
+                                    pager_data["exposures"] = exp_data
+                            except Exception:
+                                pass
+                    
+                    # --- Tectonic Summary ---
+                    ts_prods = products.get("general-text", [])
+                    if ts_prods:
+                        ts_contents = ts_prods[0].get("contents", {})
+                        if "" in ts_contents:
+                            try:
+                                raw_text = await fetch_text(client, ts_contents[""]["url"])
+                                if raw_text:
+                                    # Strip HTML tags for clean text
+                                    import re as _re
+                                    clean = _re.sub(r'<[^>]+>', '', raw_text)
+                                    tectonic_summary = clean.strip()[:1000]
+                            except Exception:
+                                pass
+                    
             except Exception:
                 pass
 
     return {
-        "events": events, "count": len(events), "message": None, 
-        "source": "USGS", "timestamp": ts, "shakemap": shakemap_geojson
+        "events": events, "count": len(events), "message": None,
+        "source": "USGS", "timestamp": ts, "shakemap": shakemap_geojson,
+        "nearby_cities": nearby_cities, "pager_data": pager_data,
+        "tectonic_summary": tectonic_summary,
+    }
+
+async def fetch_weather(lat: float, lon: float) -> dict:
+    """Fetch current weather conditions from Open-Meteo (free, no API key)."""
+    ts = datetime.now(timezone.utc).isoformat()
+    async with httpx.AsyncClient() as client:
+        data = await fetch_json(client, "https://api.open-meteo.com/v1/forecast", {
+            "latitude": lat, "longitude": lon,
+            "current_weather": "true",
+            "hourly": "visibility,relative_humidity_2m",
+            "forecast_days": 1,
+        })
+    if not data or not data.get("current_weather"):
+        return {"available": False, "source": "Open-Meteo", "timestamp": ts}
+    
+    cw = data["current_weather"]
+    # Map WMO weather codes to descriptions
+    WMO_CODES = {
+        0: "Clear sky", 1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+        45: "Fog", 48: "Rime fog", 51: "Light drizzle", 53: "Moderate drizzle",
+        55: "Dense drizzle", 61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain",
+        71: "Slight snow", 73: "Moderate snow", 75: "Heavy snow", 77: "Snow grains",
+        80: "Slight rain showers", 81: "Moderate rain showers", 82: "Violent rain showers",
+        85: "Slight snow showers", 86: "Heavy snow showers",
+        95: "Thunderstorm", 96: "Thunderstorm with hail", 99: "Thunderstorm with heavy hail",
+    }
+    
+    # Get current hour's visibility and humidity
+    visibility = None
+    humidity = None
+    hourly = data.get("hourly", {})
+    if hourly.get("visibility"):
+        visibility = hourly["visibility"][0]  # first hour
+    if hourly.get("relative_humidity_2m"):
+        humidity = hourly["relative_humidity_2m"][0]
+    
+    return {
+        "available": True,
+        "temperature_c": cw.get("temperature"),
+        "windspeed_kmh": cw.get("windspeed"),
+        "wind_direction": cw.get("winddirection"),
+        "weather_code": cw.get("weathercode"),
+        "weather_desc": WMO_CODES.get(cw.get("weathercode", -1), "Unknown"),
+        "is_day": cw.get("is_day", 1),
+        "visibility_m": visibility,
+        "humidity_pct": humidity,
+        "source": "Open-Meteo",
+        "timestamp": ts,
     }
 
 async def fetch_cyclones(lat: float, lon: float):
@@ -553,15 +656,17 @@ async def analyze_disaster_impact(lat: float, lon: float, disaster_type: str, lo
 
     task_news = fetch_news(news_query)
     task_resources = fetch_resources(lat, lon)
+    task_weather = fetch_weather(lat, lon)
     
-    disaster_data, news_data, resources_data = await asyncio.gather(
-        task_disaster, task_news, task_resources, return_exceptions=True
+    disaster_data, news_data, resources_data, weather_data = await asyncio.gather(
+        task_disaster, task_news, task_resources, task_weather, return_exceptions=True
     )
     
     # Normalize results (handle exceptions)
     if isinstance(disaster_data, Exception): disaster_data = None
     if isinstance(news_data, Exception): news_data = None
     if isinstance(resources_data, Exception): resources_data = None
+    if isinstance(weather_data, Exception): weather_data = None
     
     # =========================================================================
     # 2. Build disaster_info (what app.js renderDisasterInfo expects)
@@ -596,7 +701,27 @@ async def analyze_disaster_impact(lat: float, lon: float, disaster_type: str, lo
             "felt": strongest.get("felt"),
             "distance_km": round(haversine(lat, lon, strongest["lat"], strongest["lon"]), 1),
             "time_ago": (datetime.now(timezone.utc) - datetime.fromisoformat(strongest["time"].replace("Z", "+00:00"))).total_seconds(),
+            "significance": strongest.get("significance", 0),
+            "status": strongest.get("status", ""),
+            "event_url": strongest.get("url", ""),
+            "event_id": strongest.get("id", ""),
         }
+        
+        # MMI intensity description
+        mmi_val = strongest.get("mmi") or 0
+        MMI_DESCRIPTIONS = {
+            1: "Not Felt", 2: "Weak", 3: "Weak", 4: "Light",
+            5: "Moderate", 6: "Strong", 7: "Very Strong",
+            8: "Severe", 9: "Violent", 10: "Extreme"
+        }
+        disaster_info["mmi_description"] = MMI_DESCRIPTIONS.get(int(round(mmi_val)), "Unknown")
+        
+        # Depth classification
+        depth = strongest.get("depth_km") or 0
+        if depth < 20: disaster_info["depth_class"] = "Shallow (< 20 km)"
+        elif depth < 70: disaster_info["depth_class"] = "Intermediate (20-70 km)"
+        elif depth < 300: disaster_info["depth_class"] = "Deep (70-300 km)"
+        else: disaster_info["depth_class"] = "Very Deep (> 300 km)"
         
         # ShakeMap from fetched data
         shakemap = disaster_data.get("shakemap")
@@ -613,6 +738,11 @@ async def analyze_disaster_impact(lat: float, lon: float, disaster_type: str, lo
             concerns.append("Shallow earthquake — surface damage likely more severe")
         if max_mag >= 4.0:
             concerns.append("Utilities (gas, water, power) may be disrupted — check for gas leaks")
+        if max_mag >= 5.5:
+            concerns.append("Liquefaction risk in areas with saturated sandy soils")
+            concerns.append("Landslide risk in hilly and mountainous terrain")
+        if disaster_data.get("count", 0) > 5:
+            concerns.append(f"Elevated seismic activity — {disaster_data['count']} events detected in the region")
         
     elif disaster_type == "cyclone" and disaster_data and disaster_data.get("count", 0) > 0:
         storms = disaster_data["storms"]
@@ -656,6 +786,23 @@ async def analyze_disaster_impact(lat: float, lon: float, disaster_type: str, lo
     # =========================================================================
     impact_radius = 50 if severity in ("SEVERE", "CATASTROPHIC") else (30 if severity == "MODERATE" else 10)
     pop_data = estimate_population_exposure(lat, lon, impact_radius)
+    
+    # Multi-zone population breakdown
+    pop_zones = []
+    if severity != "NONE":
+        zone_radii = [
+            ("Severe Impact", impact_radius * 0.3, "#dc2626"),
+            ("Moderate Impact", impact_radius * 0.6, "#f97316"),
+            ("Minor Impact", impact_radius, "#eab308"),
+        ]
+        for zone_name, zone_r, zone_color in zone_radii:
+            zp = estimate_population_exposure(lat, lon, zone_r)
+            pop_zones.append({
+                "name": zone_name,
+                "radius_km": round(zone_r, 1),
+                "population": zp["estimated_population"],
+                "color": zone_color,
+            })
     
     # =========================================================================
     # 4. News
@@ -767,6 +914,7 @@ async def analyze_disaster_impact(lat: float, lon: float, disaster_type: str, lo
         # Panels
         "disaster_info": disaster_info,
         "population_exposure": pop_data,
+        "population_zones": pop_zones,
         "teams": teams,
         "concerns": concerns,
         "resources": resources_result,
@@ -779,6 +927,13 @@ async def analyze_disaster_impact(lat: float, lon: float, disaster_type: str, lo
         # Map overlays
         "shakemap": shakemap,
         "storms_wind_radii": storms_wind_radii,
+        
+        # Enriched data
+        "nearby_cities": disaster_data.get("nearby_cities", []) if disaster_data else [],
+        "pager_data": disaster_data.get("pager_data") if disaster_data else None,
+        "tectonic_summary": disaster_data.get("tectonic_summary") if disaster_data else None,
+        "recent_events": disaster_data.get("events", [])[:20] if disaster_data else [],
+        "weather": weather_data if weather_data else {"available": False},
         
         # Freshness
         "data_sources": data_sources,

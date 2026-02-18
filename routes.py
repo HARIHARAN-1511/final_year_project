@@ -109,6 +109,7 @@ async def analyze(
     # Log to DB
     new_log = AnalysisLog(
         location_name=location_name,
+        disaster_type=disaster_type,
         priority_score=result["priority_score"],
         severity=result["severity"],
         timestamp=datetime.now(timezone.utc),
