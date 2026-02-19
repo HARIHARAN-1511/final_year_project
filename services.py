@@ -17,7 +17,9 @@ from config import (
     CACHE_TTL,
     POPULATION_DENSITY,
     RESOURCE_TYPES,
-
+    GROK_API_KEY,
+    GROK_MODEL,
+    GROK_API_URL,
 )
 import json
 from utils import (
@@ -30,9 +32,78 @@ from utils import (
 from scoring_engine import (
     calculate_priority_score,
     get_priority_label,
-    calculate_news_urgency
+    calculate_news_urgency,
+    predict_severity,
+    predict_cyclone_severity,
 )
 from routing_service import format_resource_distance, get_route
+
+# ---------------------------------------------------------------------------
+# Model 3: ML Resource Demand Forecaster
+# ---------------------------------------------------------------------------
+_resource_models = None
+_resource_models_loaded = False
+
+def _load_resource_models():
+    global _resource_models, _resource_models_loaded
+    if _resource_models_loaded:
+        return _resource_models
+    try:
+        import joblib, os
+        path = os.path.join(os.path.dirname(__file__), "ml_models", "resource_model.pkl")
+        if os.path.exists(path):
+            _resource_models = joblib.load(path)
+            import logging
+            logging.getLogger(__name__).info("[ResourceForecaster] GradientBoosting models loaded.")
+        else:
+            import logging
+            logging.getLogger(__name__).warning("[ResourceForecaster] resource_model.pkl not found. Run ml_models/train_resource_forecaster.py")
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"[ResourceForecaster] Load failed: {e}")
+        _resource_models = None
+    _resource_models_loaded = True
+    return _resource_models
+
+
+def predict_resource_demand(severity: str, population: int, disaster_type: str) -> list:
+    """Use trained GradientBoosting models to predict resource quantities."""
+    SEVERITY_MAP = {"NONE": 0, "MINOR": 1, "MODERATE": 2, "SEVERE": 3, "CATASTROPHIC": 4}
+    DIS_MAP = {"earthquake": 0, "cyclone": 1}
+    import numpy as np
+    
+    pkg = _load_resource_models()
+    if pkg is None:
+        # Fall back to rule-based
+        return get_simulated_resources(severity, population)
+    
+    try:
+        sev_code = SEVERITY_MAP.get(severity, 0)
+        dis_code = DIS_MAP.get(disaster_type, 0)
+        X = np.array([[sev_code, population, dis_code]])
+        
+        models = pkg["models"]
+        resource_names = pkg["resource_names"]
+        
+        results = []
+        for rtype in RESOURCE_TYPES:
+            name = rtype["name"]
+            if name in models:
+                qty = max(0, int(models[name].predict(X)[0]))
+            else:
+                qty = 0
+            results.append({
+                "name": name,
+                "icon": rtype.get("icon", ""),
+                "quantity": qty,
+                "unit": rtype.get("unit", "units"),
+                "source": "ML-GradientBoosting"
+            })
+        return results
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"[ResourceForecaster] Predict failed: {e}. Using rule-based fallback.")
+        return get_simulated_resources(severity, population)
 
 # ---------------------------------------------------------------------------
 # Core Logic
@@ -604,18 +675,105 @@ async def get_live_feed_data():
     cy_count = sum(1 for e in events if e["type"] == "cyclone")
     total = len(events)
     
+    # Model 5a: Anomaly Detection on earthquake events
+    eq_events = [e for e in events if e["type"] == "earthquake"]
+    if eq_events:
+        try:
+            from ml_models.anomaly_detector import flag_anomalous_events
+            eq_events = flag_anomalous_events(eq_events)
+            # Merge anomaly flags back
+            eq_map = {id(e): e for e in eq_events}
+            events = [eq_map.get(id(e), e) for e in events]
+        except Exception as _ex:
+            import logging
+            logging.getLogger(__name__).warning(f"[AnomalyDetector-EQ] Failed: {_ex}")
+    
+    # Model 5b: Anomaly Detection on cyclone events
+    cy_events = [e for e in events if e["type"] == "cyclone"]
+    if cy_events:
+        try:
+            from ml_models.cyclone_anomaly_detector import flag_anomalous_cyclones
+            cy_events = flag_anomalous_cyclones(cy_events)
+            cy_map = {id(e): e for e in cy_events}
+            events = [cy_map.get(id(e), e) for e in events]
+        except Exception as _ex:
+            import logging
+            logging.getLogger(__name__).warning(f"[AnomalyDetector-CY] Failed: {_ex}")
+    
     # Limit to 5 events for the landing page feed
     events = events[:5]
     
     return {"events": events, "timestamp": ts_now, "earthquake_count": eq_count, "cyclone_count": cy_count, "total": total}
 
 # ---------------------------------------------------------------------------
-# AI Analysis (OpenRouter - OpenAI Compatible)
+# Model 4: Grok (xAI) LLM — Situation Report
 # ---------------------------------------------------------------------------
+import logging as _logging
+_log = _logging.getLogger(__name__)
 
 async def get_ai_analysis(analysis_data: dict, disaster_type: str, location_name: str) -> dict:
-    """AI Analysis disabled."""
-    return {"available": False, "summary": "AI analysis disabled", "model": None}
+    """
+    Generate a natural language situation report using Grok (xAI) API.
+    Returns {available, summary, model} or graceful fallback on failure.
+    """
+    if not GROK_API_KEY or GROK_API_KEY == "YOUR_GROK_API_KEY_HERE":
+        return {"available": False, "summary": "Grok API key not configured.", "model": None}
+
+    severity = analysis_data.get("severity", "UNKNOWN")
+    priority_score = analysis_data.get("priority_score", 0)
+    population = analysis_data.get("population_exposure", {}).get("estimated_population", 0)
+    news_count = analysis_data.get("news", {}).get("count", 0)
+    resource_count = analysis_data.get("resources", {}).get("count", 0)
+    teams = [t["name"] for t in analysis_data.get("teams", [])[:4]]
+    concerns = analysis_data.get("concerns", [])[:3]
+    dis_info = analysis_data.get("disaster_info", {})
+
+    context_lines = [
+        f"Disaster Type: {disaster_type.upper()}",
+        f"Location: {location_name}",
+        f"Severity: {severity}",
+        f"Priority Score: {priority_score}/100",
+        f"Estimated Population Exposed: {population:,}",
+        f"Nearby Emergency Resources Found: {resource_count}",
+        f"Related News Articles: {news_count}",
+    ]
+    if dis_info.get("magnitude"):
+        context_lines.append(f"Earthquake Magnitude: M{dis_info['magnitude']}, Depth: {dis_info.get('depth_km', 'N/A')} km")
+    if teams:
+        context_lines.append(f"Recommended Teams: {', '.join(teams)}")
+    if concerns:
+        context_lines.append(f"Key Concerns: {'; '.join(concerns)}")
+
+    prompt = (
+        "You are an expert emergency management analyst. Based on the following real-time disaster data, "
+        "write a concise 2-3 paragraph situation report for rescue coordinators. "
+        "Be specific, actionable, and prioritize life safety. Use plain English, no markdown.\n\n"
+        + "\n".join(context_lines)
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                GROK_API_URL,
+                headers={
+                    "Authorization": f"Bearer {GROK_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": GROK_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 400,
+                    "temperature": 0.4,
+                }
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            summary = data["choices"][0]["message"]["content"].strip()
+            _log.info(f"[Grok LLM] Situation report generated ({len(summary)} chars).")
+            return {"available": True, "summary": summary, "model": GROK_MODEL}
+    except Exception as e:
+        _log.warning(f"[Grok LLM] API call failed: {e}")
+        return {"available": False, "summary": f"AI analysis unavailable: {type(e).__name__}", "model": None}
 
 # ---------------------------------------------------------------------------
 # MAIN AGGREGATOR
@@ -683,10 +841,12 @@ async def analyze_disaster_impact(lat: float, lon: float, disaster_type: str, lo
         strongest = max(events, key=lambda e: e.get("magnitude") or 0)
         max_mag = strongest.get("magnitude") or 0
         
-        if max_mag >= 7.0: severity = "CATASTROPHIC"
-        elif max_mag >= 6.0: severity = "SEVERE"
-        elif max_mag >= 4.5: severity = "MODERATE"
-        else: severity = "MINOR"
+        # Model 1: ML Severity Classifier (RandomForest)
+        severity = predict_severity(
+            magnitude=max_mag,
+            depth_km=float(strongest.get("depth_km") or 30),
+            tsunami_flag=int(strongest.get("tsunami") or 0)
+        )
         
         disaster_info = {
             "what": f"M{max_mag} Earthquake",
@@ -754,11 +914,16 @@ async def analyze_disaster_impact(lat: float, lon: float, disaster_type: str, lo
             int_val = int(intensity)
         except (ValueError, TypeError):
             int_val = 0
-            
-        if int_val >= 115: severity = "CATASTROPHIC"
-        elif int_val >= 65: severity = "SEVERE"
-        elif int_val >= 34: severity = "MODERATE"
-        else: severity = "MINOR" if int_val > 0 else "NONE"
+        
+        # Parse pressure if available
+        pressure_raw = closest.get("pressure")
+        try:
+            pressure_hpa = float(str(pressure_raw).replace("mb", "").replace("hPa", "").strip())
+        except (ValueError, TypeError, AttributeError):
+            pressure_hpa = None
+        
+        # Model 1b: ML Cyclone Severity Classifier (RandomForest)
+        severity = predict_cyclone_severity(int_val, pressure_hpa=pressure_hpa)
         
         disaster_info = {
             "what": f"Cyclone {closest.get('name', 'Unknown')}",
@@ -866,7 +1031,8 @@ async def analyze_disaster_impact(lat: float, lon: float, disaster_type: str, lo
     # 8. Teams + Allocated Resources
     # =========================================================================
     teams = get_recommended_teams(disaster_type, severity)
-    allocated_resources = get_simulated_resources(severity, pop_data["estimated_population"])
+    # Model 3: ML Resource Demand Forecaster
+    allocated_resources = predict_resource_demand(severity, pop_data["estimated_population"], disaster_type)
     
     # =========================================================================
     # 9. Data Sources (for freshness badges)
@@ -939,8 +1105,8 @@ async def analyze_disaster_impact(lat: float, lon: float, disaster_type: str, lo
         "data_sources": data_sources,
     }
     
-    # AI analysis disabled as per user request
-    result["ai_analysis"] = {"available": False, "summary": "AI analysis disabled", "model": None}
+    # Model 4: Grok LLM Situation Report
+    result["ai_analysis"] = await get_ai_analysis(result, disaster_type, location_name)
     
     return result
 

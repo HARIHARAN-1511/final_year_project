@@ -45,7 +45,9 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # ---------------------------------------------------------------------------
-# AI / LLM Config (Disabled)
+# AI / LLM Config — Grok (xAI)
 # ---------------------------------------------------------------------------
-# AI features have been disabled.
-# ---------------------------------------------------------------------------
+import os
+GROK_API_KEY = os.environ.get("GROK_API_KEY", "")   # set via .env or system env var
+GROK_MODEL = "grok-3-mini"  # Free-tier xAI model
+GROK_API_URL = "https://api.x.ai/v1/chat/completions"

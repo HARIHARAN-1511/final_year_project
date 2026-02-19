@@ -1,24 +1,29 @@
 # 🌍 PDRDSS — Post-Disaster Rescue Decision Support System
 
-> **Real-time disaster intelligence platform** that aggregates live earthquake, cyclone, news, and resource data to assist emergency responders with data-driven rescue prioritization.
+> **AI-powered real-time disaster intelligence platform** that aggregates live earthquake and cyclone data, applies machine learning models, and generates Grok AI situation reports to assist emergency responders with data-driven rescue prioritization.
 
 ⚠️ **Academic Prototype** — This is a final-year project and is *not* a certified emergency management tool.
+
+[![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green?logo=fastapi)](https://fastapi.tiangolo.com)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-ML%20Models-orange?logo=scikit-learn)](https://scikit-learn.org)
+[![Grok AI](https://img.shields.io/badge/Grok-xAI%20LLM-black)](https://x.ai)
 
 ---
 
 ## 📋 Table of Contents
 
 - [Features](#-features)
+- [AI/ML Models](#-aiml-models)
 - [Tech Stack](#-tech-stack)
 - [System Architecture](#-system-architecture)
-- [Data Sources & APIs](#-data-sources--apis)
 - [Scoring Engine](#-scoring-engine)
+- [Data Sources & APIs](#-data-sources--apis)
 - [Project Structure](#-project-structure)
 - [Installation](#-installation)
 - [Usage](#-usage)
 - [API Endpoints](#-api-endpoints)
 - [Docker Deployment](#-docker-deployment)
-- [Screenshots](#-screenshots)
 - [License](#-license)
 
 ---
@@ -27,21 +32,150 @@
 
 | Feature | Description |
 |---|---|
-| **Live Disaster Feed** | Real-time earthquake (USGS) and cyclone (NOAA NHC) data displayed on an interactive map |
+| **Live Disaster Feed** | Real-time earthquake (USGS) and cyclone (NOAA NHC) data on an interactive dark map |
+| **ML Severity Classification** | RandomForest classifiers predict earthquake & cyclone severity from raw sensor data |
+| **NLP News Urgency** | DistilBERT zero-shot classifier scores news article urgency (replaces keyword counting) |
+| **ML Resource Forecasting** | GradientBoosting models predict demand for 10 resource types based on severity & population |
+| **Grok AI Situation Reports** | xAI Grok LLM generates a 2–3 paragraph expert situation assessment for each analysis |
+| **Anomaly Detection** | IsolationForest flags statistically unusual earthquake & cyclone events in the live feed |
 | **Geocoding & Search** | Search any location by name or coordinates with confidence scoring |
-| **Impact Analysis** | Aggregated analysis combining seismic data, population exposure, nearby resources, and news |
-| **Priority Scoring** | Weighted multi-factor scoring engine (severity, population, resource distance, news urgency) |
-| **Resource Mapping** | Nearby hospitals, fire stations, and police stations via OpenStreetMap Overpass API |
-| **Population Estimation** | Circular impact zone population exposure using WorldPop national density data |
-| **News Integration** | Real-time disaster news from GDELT DOC 2.0 API with urgency keyword analysis |
-| **Damage Zones** | GeoJSON-based damage zone visualization (epicentral, moderate, light) on Leaflet maps |
-| **Rescue Team Recommendations** | Deterministic team allocation based on disaster type and severity |
-| **Resource Allocation** | WHO/Sphere Standards-based resource calculation (water, shelter, medical, SAR equipment) |
-| **Wind Field Visualization** | Cyclone wind radii polygons (34kt, 50kt, 64kt force zones) rendered on map |
+| **Population Exposure** | Circular impact zone population estimation using WorldPop density data |
+| **Resource Mapping** | Nearby hospitals, fire stations & police via OpenStreetMap Overpass API |
+| **Damage Zone Visualization** | GeoJSON epicentral / moderate / light damage zones on Leaflet map |
+| **Priority Scoring** | Weighted 0–100 rescue priority score combining all ML-derived inputs |
+| **Wind Field Visualization** | Cyclone 34/50/64 kt wind radii polygons on map |
 | **User Authentication** | JWT-based login with role-based access (admin/user) |
 | **Analysis History** | Logged past analyses with filtering, sorting, and analytics dashboard |
-| **Dark Emergency Theme** | Professional dark UI optimized for emergency operations center readability |
-| **Docker Support** | Containerized deployment with Docker and Docker Compose |
+| **Dark Emergency Theme** | Professional dark UI optimized for EOC readability |
+| **Docker Support** | Containerized deployment with Docker Compose |
+
+---
+
+## 🤖 AI/ML Models
+
+PDRDSS integrates **5 AI/ML models** — implemented as separate, independently trained scikit-learn models in the `ml_models/` package.
+
+### Model 1 — Earthquake Severity Classifier (RandomForest)
+
+**File:** `ml_models/train_severity_classifier.py` → saves `ml_models/severity_model.pkl`  
+**Integration:** `scoring_engine.py` → `predict_severity(magnitude, depth_km, tsunami_flag)`
+
+| Metric | Value |
+|---|---|
+| Algorithm | `RandomForestClassifier` (120 estimators) |
+| Features | Magnitude, depth (km), tsunami flag |
+| Classes | CATASTROPHIC · SEVERE · MODERATE · MINOR |
+| Accuracy | **93%** on held-out test set |
+
+- Replaces hardcoded `if mag >= 7.0` threshold rules
+- A shallow M6.5 with a tsunami flag correctly escalates to CATASTROPHIC
+- **Fallback:** rule-based Richter thresholds if model unavailable
+
+---
+
+### Model 1b — Cyclone Severity Classifier (RandomForest)
+
+**File:** `ml_models/train_cyclone_severity_classifier.py` → saves `ml_models/cyclone_severity_model.pkl`  
+**Integration:** `scoring_engine.py` → `predict_cyclone_severity(intensity_kt, pressure_hpa, intensification_rate)`
+
+| Metric | Value |
+|---|---|
+| Algorithm | `RandomForestClassifier` (120 estimators) |
+| Features | Wind speed (kt), central pressure (hPa), intensification rate (kt/6h) |
+| Classes | CATASTROPHIC · SEVERE · MODERATE · MINOR · NONE |
+| Accuracy | **93%** on held-out test set |
+
+- Replaces single-variable Saffir-Simpson threshold rules
+- Pressure and intensification rate improve Cat 4/5 detection beyond wind alone
+- Dashboard shows Saffir-Simpson category, wind speed in kt/km/h/mph, gradient intensity bar
+- **Fallback:** standard Saffir-Simpson thresholds if model unavailable
+
+---
+
+### Model 2 — NLP News Urgency Classifier (DistilBERT)
+
+**File:** `ml_models/news_classifier.py`  
+**Integration:** `scoring_engine.py` → `calculate_news_urgency(articles)`
+
+| Metric | Value |
+|---|---|
+| Model | `typeform/distilbert-base-uncased-mnli` (HuggingFace) |
+| Method | Zero-shot classification pipeline |
+| Labels | `"urgent life-threatening disaster"` · `"moderate disaster concern"` · `"routine news"` |
+| Download | ~250 MB (auto-cached on first run) |
+
+- Replaces a simple keyword-counting loop
+- **Fallback:** keyword-based scoring if model unavailable or download fails
+
+---
+
+### Model 3 — Resource Demand Forecaster (GradientBoosting)
+
+**File:** `ml_models/train_resource_forecaster.py` → saves `ml_models/resource_model.pkl`  
+**Integration:** `services.py` → `predict_resource_demand(severity, population, disaster_type)`
+
+| Metric | Value |
+|---|---|
+| Algorithm | `GradientBoostingRegressor` × 10 (one per resource type) |
+| Features | Severity code, log-population, disaster type (earthquake/cyclone) |
+| Resources Predicted | Water · Shelter · Medical · SAR · Comms · Generators · Food · Blankets · First Aid · Vehicles |
+| R² Score | **0.979–0.986** across all 10 resource models |
+
+- Replaces static WHO/Sphere Standards lookup table
+- Quantities labelled with `"source": "ML-GradientBoosting"` in API response
+- **Fallback:** WHO/Sphere rules-based table if model unavailable
+
+---
+
+### Model 4 — Grok AI Situation Report (xAI LLM)
+
+**Integration:** `services.py` → `get_ai_analysis()` called inside `analyze_disaster_impact()`
+
+| Property | Value |
+|---|---|
+| Provider | xAI (Grok) |
+| Model | `grok-3-mini` |
+| Endpoint | `https://api.x.ai/v1/chat/completions` |
+| Config | `GROK_API_KEY` in `config.py` |
+
+- Generates a **2–3 paragraph expert situation assessment** per analysis
+- Context passed: severity, population, event data, resource counts, rescue teams
+- Dashboard renders this as a **🤖 AI Situation Report** panel after the News section
+- Includes ethical disclaimer: *"AI-generated assessment — for decision support only"*
+- **Fallback:** graceful error message if API call fails
+
+---
+
+### Model 5 — Anomaly Detection for Earthquakes (IsolationForest)
+
+**File:** `ml_models/anomaly_detector.py`  
+**Integration:** `services.py` → `get_live_feed_data()` — runs on every earthquake event batch
+
+| Property | Value |
+|---|---|
+| Algorithm | `IsolationForest` (unsupervised, no pre-training) |
+| Features | Magnitude, depth (km), significance score |
+| Contamination | 10% (expects ~1 in 10 to be anomalous) |
+
+- Fits on the *live batch* each time — catches current-session outliers
+- Flagged events show **⚠ UNUSUAL** amber badge in the Recent Events table
+- Badge includes human-readable note: *"unusually high magnitude", "extremely shallow depth"*
+
+---
+
+### Model 5b — Anomaly Detection for Cyclones (IsolationForest)
+
+**File:** `ml_models/cyclone_anomaly_detector.py`  
+**Integration:** `services.py` → `get_live_feed_data()` — runs on cyclone events parallel to Model 5
+
+| Property | Value |
+|---|---|
+| Algorithm | `IsolationForest` (unsupervised) |
+| Features | Wind speed (kt), estimated central pressure (hPa) |
+| Contamination | 15% |
+
+- Flags extreme storms: *"extreme wind speed (155 kt), extremely low pressure (900 hPa), rapid intensification pattern"*
+- Same **⚠ UNUSUAL** amber badge in live feed table
 
 ---
 
@@ -58,6 +192,10 @@
 | **httpx** | Async HTTP client for external API calls |
 | **passlib + bcrypt** | Password hashing |
 | **python-jose** | JWT token generation & validation |
+| **scikit-learn** | ML models (RandomForest, GradientBoosting, IsolationForest) |
+| **joblib** | Model serialization (.pkl files) |
+| **transformers** | HuggingFace NLP pipeline (DistilBERT zero-shot) |
+| **torch** | PyTorch backend for transformers |
 
 ### Frontend
 | Technology | Purpose |
@@ -73,64 +211,67 @@
 | **USGS Earthquake API** | Real-time seismic event data |
 | **NOAA NHC (GIS)** | Active cyclone/hurricane advisories |
 | **GDELT DOC 2.0** | Real-time disaster news articles |
-| **OpenStreetMap Overpass** | Nearby emergency resources (hospitals, fire stations, police) |
+| **OpenStreetMap Overpass** | Nearby emergency resources |
 | **Nominatim (OSM)** | Geocoding — place name to coordinates |
+| **xAI Grok API** | LLM-generated situation reports |
 
 ---
 
 ## 🏗 System Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Frontend (Browser)                 │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │
-│  │ Landing  │ │Dashboard │ │ History  │ │Analytics│ │
-│  │  Page    │ │  + Map   │ │  Logs    │ │ Charts │ │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └───┬────┘ │
-│       └─────────────┴────────────┴───────────┘      │
-└──────────────────────┬──────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Frontend (Browser)                        │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────┐   │
+│  │ Landing  │  │Dashboard │  │ History  │  │   Analytics   │   │
+│  │  + Map   │  │  + ML UI │  │   Logs   │  │    Charts     │   │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────┬────────┘   │
+└───────┴─────────────┴─────────────┴────────────────┴────────────┘
                        │ REST API (JSON)
-┌──────────────────────▼──────────────────────────────┐
-│                  FastAPI Backend                      │
-│  ┌──────────┐ ┌──────────┐ ┌───────────┐            │
-│  │  Routes  │ │ Services │ │  Scoring  │            │
-│  │ (API)    │→│ (Logic)  │→│  Engine   │            │
-│  └──────────┘ └────┬─────┘ └───────────┘            │
-│  ┌──────────┐      │       ┌───────────┐            │
-│  │   Auth   │      │       │   Utils   │            │
-│  │  (JWT)   │      │       │ (Cache,   │            │
-│  └──────────┘      │       │  Geo)     │            │
-│                    │       └───────────┘            │
-└────────────────────┼────────────────────────────────┘
-                     │ Async HTTP (httpx)
-    ┌────────────────┼────────────────────┐
-    ▼                ▼                    ▼
-┌────────┐    ┌──────────┐       ┌──────────────┐
-│  USGS  │    │   NOAA   │       │   GDELT /    │
-│Earthquakes│ │ Cyclones │       │ OSM Overpass │
-└────────┘    └──────────┘       └──────────────┘
+┌──────────────────────▼──────────────────────────────────────────┐
+│                      FastAPI Backend                             │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────────────────────┐ │
+│  │  Routes  │  │ Services │  │         ML Models Package       │ │
+│  │ (API)    │→ │ (Logic)  │→ │  ┌─────────┐  ┌─────────────┐  │ │
+│  └──────────┘  └──────────┘  │  │Severity │  │  Resource   │  │ │
+│  ┌──────────┐  ┌──────────┐  │  │Classif. │  │ Forecaster  │  │ │
+│  │  Auth    │  │ Scoring  │  │  │(RF×2)   │  │ (GBR×10)    │  │ │
+│  │  (JWT)   │  │  Engine  │  │  └─────────┘  └─────────────┘  │ │
+│  └──────────┘  └──────────┘  │  ┌─────────┐  ┌─────────────┐  │ │
+│                               │  │DistilBERT  │ Anomaly Det.│  │ │
+│                               │  │  NLP    │  │ (IsoForest) │  │ │
+│                               │  └─────────┘  └─────────────┘  │ │
+│                               └────────────────────────────────┘ │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │ Async HTTP (httpx)
+    ┌─────────────────┼─────────────────────────┐
+    ▼                 ▼                          ▼
+┌────────┐     ┌──────────┐             ┌──────────────────┐
+│  USGS  │     │   NOAA   │             │  GDELT / OSM /   │
+│Seismic │     │ Cyclones │             │  xAI Grok API    │
+└────────┘     └──────────┘             └──────────────────┘
 ```
 
 ---
 
 ## 📊 Scoring Engine
 
-The priority scoring engine uses a **weighted multi-factor formula** to produce a 0–100 rescue priority score:
+The priority scoring engine uses a **weighted multi-factor formula** to produce a 0–100 rescue priority score. All inputs are now **ML-derived**:
 
 ```
 Score = (0.4 × Severity) + (0.3 × Population) + (0.2 × Resource Distance) + (0.1 × News Urgency)
 ```
 
-| Factor | Weight | Scale | Source |
+| Factor | Weight | Source | ML Model |
 |---|---|---|---|
-| **Severity** | 40% | Categorical → 0–100 | Magnitude/intensity mapping |
-| **Population Exposure** | 30% | Log₁₀ scale → 0–100 | WorldPop density × impact area |
-| **Resource Distance** | 20% | Linear km → 0–100 | Nearest hospital/station via OSM |
-| **News Urgency** | 10% | Keyword analysis → 0–100 | GDELT headline keyword scoring |
+| **Severity** | 40% | Strongest event | RandomForest classifier |
+| **Population Exposure** | 30% | WorldPop log₁₀ | Rule-based (geo) |
+| **Resource Distance** | 20% | Nearest OSM resource | Rule-based (geo) |
+| **News Urgency** | 10% | GDELT articles | DistilBERT NLP |
 
 ### Priority Labels
 
-| Score Range | Label |
+| Score | Label |
 |---|---|
 | 85–100 | 🔴 **CRITICAL** |
 | 60–84 | 🟠 **HIGH** |
@@ -143,38 +284,51 @@ Score = (0.4 × Severity) + (0.3 × Population) + (0.2 × Resource Distance) + (
 
 ```
 PRDSSS/
-├── main.py                 # FastAPI app entry point & frontend routes
-├── routes.py               # API route definitions
-├── services.py             # Core business logic & external API integration
-├── scoring_engine.py       # Multi-factor priority scoring algorithm
-├── models.py               # SQLAlchemy ORM models (User, AnalysisLog, Cache)
-├── database.py             # Async database engine & session factory
-├── auth.py                 # JWT authentication & password hashing
-├── config.py               # Configuration constants & resource definitions
-├── utils.py                # Caching, HTTP helpers, geospatial utilities
-├── routing_service.py      # Distance formatting & routing helpers
-├── background_tasks.py     # Background task scheduling
-├── create_admin.py         # Admin user creation script
-├── requirements.txt        # Python dependencies
-├── Dockerfile              # Container image definition
-├── docker-compose.yml      # Container orchestration
-├── .gitignore              # Git ignore rules
+├── main.py                  # FastAPI app entry point & frontend routes
+├── routes.py                # API route definitions
+├── services.py              # Core business logic, external API integration, ML calls
+├── scoring_engine.py        # Multi-factor priority scoring + ML severity predictors
+├── models.py                # SQLAlchemy ORM models (User, AnalysisLog, Cache)
+├── database.py              # Async database engine & session factory
+├── auth.py                  # JWT authentication & password hashing
+├── config.py                # Configuration constants, API keys, resource definitions
+├── utils.py                 # Caching, HTTP helpers, geospatial utilities
+├── routing_service.py       # Distance formatting & routing helpers
+├── background_tasks.py      # Background task scheduling
+├── create_admin.py          # Admin user creation script
+├── requirements.txt         # Python dependencies
+├── Dockerfile               # Container image definition
+├── docker-compose.yml       # Container orchestration
+├── ARCHITECTURE.md          # Detailed system architecture diagrams
+├── .gitignore               # Git ignore rules
 │
-└── static/                 # Frontend assets
-    ├── index.html           # Landing page with live disaster feed
-    ├── dashboard.html       # Analysis dashboard with interactive map
-    ├── login.html           # User authentication page
-    ├── history.html         # Past analysis logs viewer
-    ├── analytics.html       # Analytics charts & statistics
+├── ml_models/               # 🤖 AI/ML Model Package
+│   ├── __init__.py
+│   ├── train_severity_classifier.py       # Train earthquake severity RF model
+│   ├── train_cyclone_severity_classifier.py  # Train cyclone severity RF model
+│   ├── train_resource_forecaster.py       # Train resource demand GBR models
+│   ├── news_classifier.py                 # DistilBERT NLP urgency wrapper
+│   ├── anomaly_detector.py                # IsolationForest for earthquakes
+│   ├── cyclone_anomaly_detector.py        # IsolationForest for cyclones
+│   ├── severity_model.pkl                 # Trained earthquake classifier
+│   ├── cyclone_severity_model.pkl         # Trained cyclone classifier
+│   └── resource_model.pkl                 # Trained resource forecaster (10 models)
+│
+└── static/                  # Frontend assets
+    ├── index.html            # Landing page with live disaster feed + earthquake tracker
+    ├── dashboard.html        # Analysis dashboard with interactive map
+    ├── login.html            # User authentication page
+    ├── history.html          # Past analysis logs viewer
+    ├── analytics.html        # Analytics charts & statistics
     ├── css/
-    │   ├── landing.css      # Landing page styles
-    │   └── style.css        # Dashboard & global styles
+    │   ├── landing.css       # Landing page styles
+    │   └── style.css         # Dashboard & global styles
     └── js/
-        ├── landing.js       # Live feed, search, & landing logic
-        ├── app.js           # Dashboard map, analysis, & rendering
-        ├── auth.js          # Token management & auth helpers
-        ├── history.js       # History page logic
-        └── analytics.js     # Chart rendering & stats
+        ├── landing.js        # Live feed, earthquake tracker, search & map logic
+        ├── app.js            # Dashboard map, ML analysis rendering
+        ├── auth.js           # Token management & auth helpers
+        ├── history.js        # History page logic
+        └── analytics.js      # Chart rendering & stats
 ```
 
 ---
@@ -185,6 +339,8 @@ PRDSSS/
 - **Python 3.9+**
 - **pip** (Python package manager)
 - **Git**
+
+> ⚠️ **Note:** The `transformers` package (DistilBERT) requires ~2 GB disk space for PyTorch. The model (~250 MB) downloads automatically on first use and is cached locally.
 
 ### Steps
 
@@ -210,14 +366,22 @@ PRDSSS/
    pip install -r requirements.txt
    ```
 
-4. **Create an admin user** (optional — for authenticated features)
+4. **Train the ML models** (one-time setup — takes ~30 seconds)
+   ```bash
+   python ml_models/train_severity_classifier.py
+   python ml_models/train_cyclone_severity_classifier.py
+   python ml_models/train_resource_forecaster.py
+   ```
+   > The trained `.pkl` files are already committed to the repository, so this step is only needed if you delete them.
+
+5. **Create an admin user** (optional — for authenticated features)
    ```bash
    python create_admin.py
    ```
 
-5. **Run the application**
+6. **Run the application**
    ```bash
-   python main.py
+   python -m uvicorn main:app --host 0.0.0.0 --port 8000
    ```
    The server starts at **http://localhost:8000**
 
@@ -225,12 +389,18 @@ PRDSSS/
 
 ## 💻 Usage
 
-1. **Landing Page** (`/`) — View a live feed of recent earthquakes and active cyclones worldwide
-2. **Search** — Enter a location name (e.g., "Tokyo", "California") or coordinates to geocode
-3. **Dashboard** (`/dashboard`) — Run disaster impact analysis on any location with interactive Leaflet map
-4. **Analysis** — View damage zones, nearby resources, rescue team recommendations, and priority score
-5. **History** (`/history`) — Browse past analysis reports with sorting and filtering
-6. **Analytics** (`/analytics`) — View aggregate statistics and charts of your analyses
+1. **Landing Page** (`/`) — View real-time earthquake tracker (EarthquakeTrack-style) and active cyclone feed
+2. **Search** — Enter a location name (e.g., "Tokyo", "Mumbai") or coordinates (lat, lon)
+3. **Dashboard** (`/dashboard`) — Run ML-powered disaster impact analysis on any location
+4. **Analysis Panels** — View:
+   - ML-predicted severity (with model label)
+   - Damage zones on interactive Leaflet map
+   - ML-forecasted resource requirements (10 types)
+   - Rescue team recommendations
+   - 🤖 Grok AI situation report
+   - ⚠ Anomaly badges on unusual events
+5. **History** (`/history`) — Browse past analysis reports
+6. **Analytics** (`/analytics`) — View aggregate statistics and charts
 
 ---
 
@@ -238,17 +408,37 @@ PRDSSS/
 
 | Method | Endpoint | Description | Auth Required |
 |---|---|---|---|
-| `GET` | `/api/live-feed` | Recent earthquakes + active cyclones | No |
+| `GET` | `/api/live-feed` | Recent earthquakes + cyclones with anomaly flags | No |
 | `GET` | `/api/geocode?location=...` | Geocode a place name to coordinates | No |
 | `GET` | `/api/earthquake?lat=...&lon=...` | Fetch earthquakes near a location | No |
 | `GET` | `/api/cyclone?lat=...&lon=...` | Fetch active cyclones | No |
-| `GET` | `/api/news?query=...` | Fetch disaster-related news  | No |
+| `GET` | `/api/news?query=...` | Fetch disaster-related news | No |
 | `GET` | `/api/resources?lat=...&lon=...` | Nearby hospitals, fire & police stations | No |
-| `GET` | `/api/analyze?lat=...&lon=...&disaster_type=...` | Full impact analysis | No |
+| `GET` | `/api/analyze?lat=...&lon=...&disaster_type=...` | Full ML-powered impact analysis + Grok AI report | No |
 | `POST` | `/token` | Login and get JWT access token | No |
 | `GET` | `/users/me` | Get current user info | Yes |
 | `GET` | `/api/history` | Past analysis logs | Yes |
 | `GET` | `/api/stats` | Aggregate analytics stats | Yes |
+
+### Sample `/api/analyze` Response (AI/ML fields)
+
+```json
+{
+  "severity": "CATASTROPHIC",
+  "priority_score": 91.4,
+  "allocated_resources": [
+    { "name": "Water Purification Units", "quantity": 42, "source": "ML-GradientBoosting" }
+  ],
+  "ai_analysis": {
+    "available": true,
+    "summary": "The M7.8 earthquake near Adana poses an extreme humanitarian crisis...",
+    "model": "grok-3-mini"
+  },
+  "recent_events": [
+    { "magnitude": 7.8, "is_anomaly": true, "anomaly_note": "unusually high magnitude" }
+  ]
+}
+```
 
 ---
 

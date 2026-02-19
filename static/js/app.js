@@ -349,6 +349,7 @@ function renderAnalysis(data) {
     renderWeather(data);
     renderRecentEvents(data);
     renderNews(data);
+    renderAiAnalysis(data);
     updateFreshnessBadges(data);
 }
 
@@ -627,16 +628,79 @@ function renderDisasterInfo(data) {
             </div>` : ''}
         `;
     } else {
+        // Rich cyclone panel — mirrors earthquake panel detail level
+        const windKt = parseInt(info.intensity_kt) || 0;
+        const windKph = Math.round(windKt * 1.852);
+        const windMph = Math.round(windKt * 1.151);
+
+        // Saffir-Simpson category helper
+        const getSaffirCategory = (kt) => {
+            if (kt >= 137) return { cat: 'Category 5', color: '#7c3aed', emoji: '🌪️' };
+            if (kt >= 113) return { cat: 'Category 4', color: '#dc2626', emoji: '🌪️' };
+            if (kt >= 96) return { cat: 'Category 3', color: '#ea580c', emoji: '🌀' };
+            if (kt >= 83) return { cat: 'Category 2', color: '#f97316', emoji: '🌀' };
+            if (kt >= 64) return { cat: 'Category 1', color: '#eab308', emoji: '🌀' };
+            if (kt >= 34) return { cat: 'Tropical Storm', color: '#3b82f6', emoji: '🌧️' };
+            if (kt > 0) return { cat: 'Tropical Depression', color: '#22c55e', emoji: '🌬️' };
+            return { cat: 'Extratropical / Remnant', color: '#94a3b8', emoji: '☁️' };
+        };
+
+        const catInfo = getSaffirCategory(windKt);
+        const intensPct = Math.min(100, Math.round((windKt / 200) * 100));
+        const pressure = info.pressure ? `${info.pressure} hPa` : '—';
+
         html = `
-            <div class="info-row"><span class="info-row-label">Storm</span><span class="info-row-value">${info.what || '—'}</span></div>
-            <div class="info-row"><span class="info-row-label">Region</span><span class="info-row-value">${info.where || '—'}</span></div>
-            <div class="info-row"><span class="info-row-label">Intensity</span><span class="info-row-value mono">${info.intensity_kt ? info.intensity_kt + ' kt' : '—'}</span></div>
-            <div class="info-row"><span class="info-row-label">Classification</span><span class="info-row-value">${info.classification || '—'}</span></div>
-            <div class="info-row"><span class="info-row-label">Active Storms</span><span class="info-row-value mono">${info.total_active || 0}</span></div>
-            <div class="info-row"><span class="info-row-label">Severity</span><span class="info-row-value">${severityBadge(data.severity)}</span></div>`;
+            <div style="text-align:center; margin-bottom:1.2rem; padding-bottom:1.2rem; border-bottom:1px solid #e5e7eb;">
+                <div style="font-size:2rem; margin-bottom:0.3rem;">${catInfo.emoji}</div>
+                <div style="font-size:1.5rem; font-weight:800; color:${catInfo.color}; line-height:1.2; margin-bottom:0.3rem;">${catInfo.cat}</div>
+                <div style="font-size:1rem; font-weight:700; color:#334155; margin-bottom:0.15rem;">${info.what || 'Active Cyclone'}</div>
+                <div style="font-size:0.85rem; color:#64748b;">${info.where || '—'}</div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1rem;">
+                <div class="info-row" style="flex-direction:column; align-items:flex-start; gap:0.2rem;">
+                    <span class="info-row-label">Wind Speed</span>
+                    <span class="info-row-value mono" style="font-size:1.05rem; font-weight:800; color:${catInfo.color};">${windKt} kt</span>
+                    <span style="font-size:0.75rem; color:#94a3b8;">${windKph} km/h · ${windMph} mph</span>
+                </div>
+                <div class="info-row" style="flex-direction:column; align-items:flex-start; gap:0.2rem;">
+                    <span class="info-row-label">Central Pressure</span>
+                    <span class="info-row-value mono" style="font-size:1.05rem; font-weight:700;">${pressure}</span>
+                    <span style="font-size:0.75rem; color:#94a3b8;">Lower = more intense</span>
+                </div>
+            </div>
+
+            <div class="info-row"><span class="info-row-label">Severity (ML)</span>
+                <span class="info-row-value">${severityBadge(data.severity)}
+                    <span style="margin-left:6px;font-size:0.7rem;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:4px;padding:1px 5px;">RandomForest</span>
+                </span>
+            </div>
+            <div class="info-row"><span class="info-row-label">Classification</span><span class="info-row-value">${info.classification || catInfo.cat}</span></div>
+            <div class="info-row"><span class="info-row-label">Active Storms</span><span class="info-row-value mono" style="font-weight:700;">${info.total_active || 0}</span></div>
+
+            <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid #e5e7eb;">
+                <div style="font-size:0.8rem; color:#64748b; font-weight:600; margin-bottom:0.4rem;">WIND INTENSITY SCALE (SAFFIR-SIMPSON)</div>
+                <div style="display:flex; align-items:center; gap:0.75rem;">
+                    <div style="flex:1; background:#e2e8f0; border-radius:6px; height:10px; overflow:hidden;">
+                        <div style="width:${intensPct}%; height:100%; background: linear-gradient(90deg, #22c55e, #eab308, #f97316, #dc2626, #7c3aed); border-radius:6px; transition:width 0.6s;"></div>
+                    </div>
+                    <span class="mono" style="font-weight:700; font-size:0.9rem; color:${catInfo.color};">${windKt} kt</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:#94a3b8; margin-top:4px;">
+                    <span>TD ≤33</span><span>TS 34–63</span><span>Cat1–2 64–95</span><span>Cat3–5 ≥96</span>
+                </div>
+            </div>
+
+            <div style="margin-top:1rem; padding:0.75rem; background:#eff6ff; border-radius:8px; border-left:3px solid #3b82f6;">
+                <div style="font-size:0.8rem; color:#1e40af; font-weight:600; margin-bottom:0.3rem;">🤖 ML MODEL</div>
+                <div style="font-size:0.8rem; color:#374151; line-height:1.5;">
+                    Severity assessed by <strong>RandomForest classifier</strong> using wind (${windKt} kt), pressure (${pressure}), and intensification rate as features.
+                </div>
+            </div>`;
     }
     body.innerHTML = html;
 }
+
 
 // --- Population Exposure Panel ---
 function renderPopulationExposure(data) {
@@ -833,6 +897,7 @@ function renderRecentEvents(data) {
                             <span style="display:inline-block;padding:2px 8px;border-radius:4px;background:${getMagColor(ev.magnitude)};color:#fff;font-weight:700;font-size:0.8rem;min-width:40px;text-align:center;">
                                 M${(ev.magnitude || 0).toFixed(1)}
                             </span>
+                            ${ev.is_anomaly ? `<span title="${ev.anomaly_note || 'Unusual event'}" style="margin-left:4px;font-size:0.75rem;background:#fef3c7;color:#92400e;border:1px solid #fbbf24;border-radius:4px;padding:1px 5px;font-weight:700;">⚠ UNUSUAL</span>` : ''}
                         </td>
                         <td style="padding:0.4rem 0.5rem;color:#334155;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${ev.place || ''}">${ev.place || 'Unknown'}</td>
                         <td style="padding:0.4rem 0.5rem;text-align:right;color:#64748b;" class="mono">${ev.depth_km ? ev.depth_km.toFixed(1) + ' km' : '—'}</td>
@@ -844,6 +909,47 @@ function renderRecentEvents(data) {
         </table>
         <div style="font-size:0.75rem;color:#94a3b8;text-align:right;margin-top:0.5rem;">Showing ${events.length} events • Source: USGS</div>
     `;
+}
+
+// --- AI Analysis Panel (Grok LLM Situation Report) ---
+function renderAiAnalysis(data) {
+    // Find or create the AI panel container
+    let container = document.getElementById('aiAnalysisPanel');
+    if (!container) {
+        // Insert after news section
+        const newsSection = document.querySelector('.news-section') || document.querySelector('#newsBody')?.closest('.panel-section');
+        if (!newsSection) return;
+        container = document.createElement('div');
+        container.id = 'aiAnalysisPanel';
+        container.className = 'panel-section ai-analysis-section';
+        newsSection.insertAdjacentElement('afterend', container);
+    }
+
+    const ai = data.ai_analysis;
+    if (!ai || !ai.available) {
+        container.innerHTML = `
+            <div class="panel-header" style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="font-size:1.1rem;">🤖</span>
+                <span>AI Situation Report</span>
+            </div>
+            <div style="padding:1rem;color:#94a3b8;font-size:0.85rem;font-style:italic;text-align:center;">
+                ${ai?.summary || 'AI analysis not available'}
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="panel-header" style="display:flex;align-items:center;gap:0.5rem;">
+            <span style="font-size:1.1rem;">🤖</span>
+            <span>AI Situation Report</span>
+            <span style="margin-left:auto;font-size:0.7rem;background:#0f172a;color:#38bdf8;padding:2px 8px;border-radius:4px;font-weight:600;">Grok ${ai.model || ''}</span>
+        </div>
+        <div style="padding:1rem;">
+            <div style="font-size:0.9rem;color:#334155;line-height:1.7;white-space:pre-wrap;">${esc(ai.summary)}</div>
+            <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.75rem;text-align:right;">
+                ⚠️ AI-generated assessment — for decision support only, not authoritative guidance
+            </div>
+        </div>`;
 }
 
 // --- News Panel ---
