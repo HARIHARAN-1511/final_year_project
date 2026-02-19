@@ -7,6 +7,13 @@ FastAPI backend serving real-time disaster data from public APIs.
 ⚠ ACADEMIC PROTOTYPE — Not a certified emergency management tool.
 """
 
+# Load .env file first so GROK_API_KEY etc. are available to config.py
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv not installed; fall back to system env vars
+
 import math
 import asyncio
 from fastapi import FastAPI
