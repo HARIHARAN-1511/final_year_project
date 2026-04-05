@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDRDSS — Live Earthquake Tracker & Disaster Support</title>
+    <title>PDRDSS — Live Earthquake Tracker</title>
     <meta name="description"
-        content="Real-time earthquake tracking with interactive map, magnitude filtering, and AI-powered disaster analysis. Data from USGS.">
+        content="Real-time earthquake tracking with interactive map, magnitude filtering, and AI-powered disaster analysis.">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,7 +20,7 @@
 
 <body>
 
-    <!-- Animated background particles -->
+    <!-- Animated background -->
     <div class="bg-grid"></div>
     <div class="bg-glow bg-glow-1"></div>
     <div class="bg-glow bg-glow-2"></div>
@@ -37,7 +37,8 @@
             <a href="#earthquake-tracker">Earthquakes</a>
             <a href="#features">Features</a>
             <a href="#data-sources">Data Sources</a>
-            <a href="/dashboard">Dashboard</a>
+            <a href="/earthquake/dashboard">Dashboard</a>
+            <a href="/select" style="opacity:0.7;">← Back</a>
         </div>
     </nav>
 
@@ -56,7 +57,7 @@
             location search, and AI-powered disaster analysis — all from live USGS data.
         </p>
 
-        <!-- Location Search Bar (EarthquakeTrack-style) -->
+        <!-- Location Search Bar -->
         <div class="search-container" id="searchContainer">
             <div class="search-input-wrapper">
                 <span class="search-icon">🔍</span>
@@ -146,7 +147,7 @@
         </div>
     </section>
 
-    <!-- ===== POPULAR REGIONS (EarthquakeTrack-style) ===== -->
+    <!-- ===== POPULAR REGIONS ===== -->
     <section class="regions-section">
         <h2 class="section-title">🌎 Popular Earthquake Regions</h2>
         <p class="section-subtitle">Quick access to seismically active regions worldwide</p>
@@ -195,26 +196,14 @@
                 <span class="region-flag">🇵🇭</span>
                 <span class="region-name">Philippines</span>
             </button>
-            <button class="region-btn" data-lat="19.43" data-lon="-99.13" data-name="Mexico City, Mexico">
-                <span class="region-flag">🇲🇽</span>
-                <span class="region-name">Mexico</span>
-            </button>
             <button class="region-btn" data-lat="28.61" data-lon="77.21" data-name="India">
                 <span class="region-flag">🇮🇳</span>
                 <span class="region-name">India</span>
             </button>
-            <button class="region-btn" data-lat="46.07" data-lon="14.51" data-name="Europe">
-                <span class="region-flag">🇪🇺</span>
-                <span class="region-name">Europe</span>
-            </button>
-            <button class="region-btn" data-lat="18.48" data-lon="-69.94" data-name="Caribbean">
-                <span class="region-flag">🌴</span>
-                <span class="region-name">Caribbean</span>
-            </button>
         </div>
     </section>
 
-    <!-- ===== EARTHQUAKE TRACKER TABLE (EarthquakeTrack-style) ===== -->
+    <!-- ===== EARTHQUAKE TRACKER TABLE ===== -->
     <section id="earthquake-tracker" class="tracker-section">
         <div class="tracker-header">
             <div class="tracker-title-row">
@@ -303,20 +292,14 @@
 
     <!-- Features Section -->
     <section id="features" class="features-section">
-        <h2 class="section-title">System Capabilities</h2>
-        <p class="section-subtitle">Comprehensive disaster analysis powered by real-time public data</p>
+        <h2 class="section-title">Earthquake Analysis Capabilities</h2>
+        <p class="section-subtitle">Comprehensive earthquake analysis powered by real-time USGS data</p>
         <div class="features-grid">
             <div class="feature-card">
                 <div class="feature-icon">🌍</div>
-                <h3>Earthquake Analysis</h3>
+                <h3>Seismic Detection</h3>
                 <p>Real-time earthquake detection via USGS API with magnitude, depth, ShakeMap overlays, and MMI
                     intensity mapping.</p>
-            </div>
-            <div class="feature-card">
-                <div class="feature-icon">🌪️</div>
-                <h3>Cyclone Tracking</h3>
-                <p>Live tropical cyclone monitoring from NOAA NHC with wind radii visualization and storm path tracking.
-                </p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">👥</div>
@@ -341,12 +324,6 @@
                 <p>Real-time news aggregation from GDELT for situational awareness and ground truth verification.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">📦</div>
-                <h3>Resource Allocation</h3>
-                <p>Simulated resource deployment planning based on disaster severity and type for academic
-                    demonstration.</p>
-            </div>
-            <div class="feature-card">
                 <div class="feature-icon">📄</div>
                 <h3>PDF Reports</h3>
                 <p>Download comprehensive analysis reports in PDF format with all disaster data, maps, and
@@ -366,11 +343,6 @@
                 <div class="source-desc">Earthquake events, ShakeMap, magnitude, depth, and alert levels</div>
             </div>
             <div class="source-card">
-                <div class="source-logo">NOAA</div>
-                <div class="source-name">National Hurricane Center</div>
-                <div class="source-desc">Tropical cyclone positions, wind radii, intensity, and forecasts</div>
-            </div>
-            <div class="source-card">
                 <div class="source-logo">GDELT</div>
                 <div class="source-name">Global Database of Events</div>
                 <div class="source-desc">Real-time news articles, ground reports, and situational updates</div>
@@ -383,47 +355,13 @@
         </div>
     </section>
 
-    <!-- Ethics Section -->
-    <section id="ethics" class="ethics-section">
-        <div class="ethics-card">
-            <div class="ethics-icon">🛡️</div>
-            <h2>Ethical Boundaries</h2>
-            <div class="ethics-grid">
-                <div class="ethics-item">
-                    <span class="ethics-check">✅</span>
-                    <span>Uses only public, open-source data from government APIs</span>
-                </div>
-                <div class="ethics-item">
-                    <span class="ethics-check">✅</span>
-                    <span>Population estimates from census-based density models (WorldPop)</span>
-                </div>
-                <div class="ethics-item">
-                    <span class="ethics-check">❌</span>
-                    <span>No mobile tracking, telecom data, or individual-level analysis</span>
-                </div>
-                <div class="ethics-item">
-                    <span class="ethics-check">❌</span>
-                    <span>No private surveillance or personally identifiable information</span>
-                </div>
-                <div class="ethics-item">
-                    <span class="ethics-check">⚠️</span>
-                    <span>Resource allocation is simulated for academic demonstration only</span>
-                </div>
-                <div class="ethics-item">
-                    <span class="ethics-check">⚠️</span>
-                    <span>Not a certified emergency tool — decisions must be made by trained responders</span>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <!-- CTA Section -->
     <section class="cta-section">
         <h2>Ready to Analyze?</h2>
-        <p>Launch the real-time disaster analysis dashboard</p>
-        <a href="/dashboard" class="btn-launch btn-launch-lg">
+        <p>Launch the earthquake analysis dashboard</p>
+        <a href="/earthquake/dashboard" class="btn-launch btn-launch-lg">
             <span class="btn-icon">🚀</span>
-            Launch Dashboard
+            Launch Earthquake Dashboard
         </a>
     </section>
 
@@ -431,13 +369,18 @@
     <footer class="footer">
         <p>⚠️ <strong>ACADEMIC PROTOTYPE</strong> — PDRDSS provides AI-assisted decision support for research purposes
             only.</p>
-        <p class="footer-sub">Built with FastAPI · Leaflet.js · USGS · NOAA · GDELT · OpenStreetMap</p>
+        <p class="footer-sub">Built with FastAPI · Leaflet.js · USGS · GDELT · OpenStreetMap</p>
     </footer>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Landing Page JS -->
-    <script src="/static/js/landing.js"></script>
+    <!-- Auth JS -->
+    <script src="/static/js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => { requireAuth(); });
+    </script>
+    <!-- Earthquake Landing JS -->
+    <script src="/static/js/earthquake-landing.js"></script>
 
 </body>
 

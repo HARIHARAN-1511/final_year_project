@@ -122,31 +122,28 @@ async def analyze(
 
 @router.get("/api/history")
 async def get_history(
-    current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Fetch past analysis logs for the current user."""
-    # If admin, fetch all? For now, fetch all for user.
-    result = await db.execute(select(AnalysisLog).where(AnalysisLog.user_id == current_user.id).order_by(AnalysisLog.timestamp.desc()))
+    """Fetch all past analysis logs."""
+    result = await db.execute(select(AnalysisLog).order_by(AnalysisLog.timestamp.desc()))
     logs = result.scalars().all()
     return logs
 
 @router.get("/api/stats")
 async def get_stats(
-    current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Aggregate stats for the analytics dashboard."""
     # Total Analysis Count
-    result_total = await db.execute(select(func.count(AnalysisLog.id)).where(AnalysisLog.user_id == current_user.id))
+    result_total = await db.execute(select(func.count(AnalysisLog.id)))
     total_count = result_total.scalar() or 0
     
     # High Priority Count
-    result_high = await db.execute(select(func.count(AnalysisLog.id)).where(AnalysisLog.user_id == current_user.id, AnalysisLog.priority_score >= 60))
+    result_high = await db.execute(select(func.count(AnalysisLog.id)).where(AnalysisLog.priority_score >= 60))
     high_count = result_high.scalar() or 0
     
     # Severity Distribution
-    result_severity = await db.execute(select(AnalysisLog.severity, func.count(AnalysisLog.id)).where(AnalysisLog.user_id == current_user.id).group_by(AnalysisLog.severity))
+    result_severity = await db.execute(select(AnalysisLog.severity, func.count(AnalysisLog.id)).group_by(AnalysisLog.severity))
     severity_dist = {row[0]: row[1] for row in result_severity.all()}
     
     return {

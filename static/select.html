@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDRDSS — Select Disaster Type</title>
+    <meta name="description" content="Choose a disaster type to begin real-time analysis.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/select.css">
+</head>
+
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="nav-icon">🛡️</span>
+            <span class="nav-title">PDRDSS</span>
+        </div>
+        <div class="nav-right">
+            <button class="btn-logout" onclick="logout()">Sign Out</button>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <div class="select-page">
+        <div class="select-header">
+            <div class="select-badge">
+                <span>🛡️</span>
+                <span>Post-Disaster Rescue Decision Support System</span>
+            </div>
+            <h1 class="select-title">
+                Choose <span class="gradient-text">Disaster Type</span>
+            </h1>
+            <p class="select-subtitle">
+                Select the type of natural disaster to access real-time tracking, interactive maps,
+                and AI-powered analysis dashboards.
+            </p>
+        </div>
+
+        <div class="cards-grid">
+            <!-- Earthquake Card -->
+            <a href="/earthquake" class="disaster-card card-earthquake" id="cardEarthquake">
+                <span class="card-icon">🌍</span>
+                <h2 class="card-title">Earthquake</h2>
+                <p class="card-desc">Real-time earthquake tracking, magnitude analysis, and seismic impact assessment.</p>
+                <ul class="card-features">
+                    <li><span class="feat-icon">📡</span> Live USGS earthquake feed</li>
+                    <li><span class="feat-icon">🗺️</span> Interactive seismic map</li>
+                    <li><span class="feat-icon">📊</span> ShakeMap & MMI intensity</li>
+                    <li><span class="feat-icon">🤖</span> AI severity classification</li>
+                    <li><span class="feat-icon">🏥</span> Nearby resource mapping</li>
+                </ul>
+                <div class="card-action">Explore Earthquakes →</div>
+            </a>
+
+            <!-- Cyclone Card -->
+            <a href="/cyclone" class="disaster-card card-cyclone" id="cardCyclone">
+                <span class="card-icon">🌪️</span>
+                <h2 class="card-title">Cyclone</h2>
+                <p class="card-desc">Tropical cyclone & hurricane monitoring with wind analysis and storm tracking.</p>
+                <ul class="card-features">
+                    <li><span class="feat-icon">🌊</span> NOAA NHC storm tracking</li>
+                    <li><span class="feat-icon">💨</span> Wind radii visualization</li>
+                    <li><span class="feat-icon">📈</span> Saffir-Simpson classification</li>
+                    <li><span class="feat-icon">🤖</span> ML severity prediction</li>
+                    <li><span class="feat-icon">🏥</span> Emergency resource mapping</li>
+                </ul>
+                <div class="card-action">Explore Cyclones →</div>
+            </a>
+        </div>
+
+        <div class="select-footer">
+            <p>⚠️ <strong>ACADEMIC PROTOTYPE</strong> — For research and demonstration purposes only.</p>
+        </div>
+    </div>
+
+    <script src="/static/js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            requireAuth();
+        });
+    </script>
+</body>
+
+</html>

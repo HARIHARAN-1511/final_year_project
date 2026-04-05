@@ -90,7 +90,7 @@ async function runDirectAnalysis(lat, lon, disasterType, locationName) {
         });
 
         if (analyzeResp.status === 401) {
-            window.location.href = '/login';
+            window.location.href = '/';
             return;
         }
 
@@ -146,7 +146,7 @@ async function runAnalysis() {
         });
 
         if (analyzeResp.status === 401) {
-            window.location.href = '/login';
+            window.location.href = '/';
             return;
         }
 

@@ -6,27 +6,37 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             const formData = new FormData(loginForm);
             const errorMsg = document.getElementById('errorMsg');
+            const submitBtn = loginForm.querySelector('button[type="submit"]');
+
+            // Disable button during login
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Signing in...';
+            }
 
             try {
                 const response = await fetch('/token', {
                     method: 'POST',
-                    body: formData // sending as form-data for OAuth2PasswordRequestForm
+                    body: formData
                 });
 
                 if (response.ok) {
                     const data = await response.json();
                     localStorage.setItem('access_token', data.access_token);
-                    // Redirect to saved return URL or dashboard
-                    const returnUrl = sessionStorage.getItem('returnUrl') || '/dashboard';
-                    sessionStorage.removeItem('returnUrl');
-                    window.location.href = returnUrl;
+                    window.location.href = '/select';
                 } else {
                     errorMsg.style.display = 'block';
+                    errorMsg.textContent = 'Incorrect username or password';
                 }
             } catch (err) {
                 console.error('Login error:', err);
                 errorMsg.style.display = 'block';
                 errorMsg.textContent = 'Connection error. Please try again.';
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Sign In';
+                }
             }
         });
     }
@@ -41,8 +51,12 @@ function getAuthHeaders() {
 // Redirect if not logged in (call this on protected pages)
 function requireAuth() {
     if (!localStorage.getItem('access_token')) {
-        // Save the full current URL so we can return after login
-        sessionStorage.setItem('returnUrl', window.location.href);
-        window.location.href = '/login';
+        window.location.href = '/';
     }
+}
+
+// Logout helper
+function logout() {
+    localStorage.removeItem('access_token');
+    window.location.href = '/';
 }

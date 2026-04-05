@@ -1,0 +1,363 @@
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: #0a0e1a;
+    min-height: 100vh;
+    color: #f1f5f9;
+    overflow-x: hidden;
+}
+
+/* ===== Background ===== */
+.bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.bg-glow {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(140px);
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.bg-glow-1 {
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, #1e40af, transparent 70%);
+    top: -200px;
+    right: -100px;
+}
+
+.bg-glow-2 {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, #7c3aed, transparent 70%);
+    bottom: -150px;
+    left: -100px;
+}
+
+/* ===== Navbar ===== */
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+    background: rgba(10, 14, 26, 0.8);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.nav-icon {
+    font-size: 1.4rem;
+}
+
+.nav-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.nav-user {
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+
+.btn-logout {
+    padding: 0.4rem 1rem;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: 'Inter', sans-serif;
+}
+
+.btn-logout:hover {
+    background: rgba(239, 68, 68, 0.25);
+    color: #fee2e2;
+}
+
+/* ===== Main Content ===== */
+.select-page {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6rem 2rem 3rem;
+}
+
+.select-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    animation: fadeInUp 0.6s ease;
+}
+
+.select-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    border-radius: 50px;
+    padding: 0.4rem 1rem;
+    font-size: 0.8rem;
+    color: #7dd3fc;
+    font-weight: 500;
+    margin-bottom: 1.5rem;
+}
+
+.select-title {
+    font-size: 2.8rem;
+    font-weight: 800;
+    line-height: 1.15;
+    margin-bottom: 1rem;
+    letter-spacing: -0.03em;
+}
+
+.select-title .gradient-text {
+    background: linear-gradient(135deg, #38bdf8, #818cf8, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.select-subtitle {
+    font-size: 1.05rem;
+    color: #94a3b8;
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
+/* ===== Cards Grid ===== */
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+    max-width: 850px;
+    width: 100%;
+    animation: fadeInUp 0.8s ease 0.1s both;
+}
+
+.disaster-card {
+    position: relative;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 20px;
+    padding: 2.5rem 2rem;
+    cursor: pointer;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.disaster-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+.disaster-card:hover {
+    transform: translateY(-8px);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.disaster-card:hover::before {
+    opacity: 1;
+}
+
+/* Earthquake card accent */
+.card-earthquake::before {
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.08), rgba(249, 115, 22, 0.06));
+}
+
+.card-earthquake:hover {
+    border-color: rgba(234, 179, 8, 0.3);
+}
+
+/* Cyclone card accent */
+.card-cyclone::before {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(124, 58, 237, 0.06));
+}
+
+.card-cyclone:hover {
+    border-color: rgba(56, 189, 248, 0.3);
+}
+
+.card-icon {
+    font-size: 4rem;
+    margin-bottom: 1.2rem;
+    display: block;
+    transition: transform 0.4s ease;
+}
+
+.disaster-card:hover .card-icon {
+    transform: scale(1.15);
+}
+
+.card-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin-bottom: 0.6rem;
+    letter-spacing: -0.02em;
+}
+
+.card-earthquake .card-title {
+    color: #fbbf24;
+}
+
+.card-cyclone .card-title {
+    color: #38bdf8;
+}
+
+.card-desc {
+    font-size: 0.88rem;
+    color: #94a3b8;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+}
+
+.card-features {
+    list-style: none;
+    text-align: left;
+    width: 100%;
+    margin-bottom: 1.5rem;
+}
+
+.card-features li {
+    font-size: 0.82rem;
+    color: #cbd5e1;
+    padding: 0.35rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.card-features li .feat-icon {
+    flex-shrink: 0;
+    font-size: 0.9rem;
+}
+
+.card-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 1.5rem;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    transition: all 0.25s ease;
+    border: none;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+}
+
+.card-earthquake .card-action {
+    background: linear-gradient(135deg, #d97706, #ea580c);
+    color: white;
+}
+
+.card-earthquake .card-action:hover {
+    box-shadow: 0 6px 20px rgba(217, 119, 6, 0.35);
+}
+
+.card-cyclone .card-action {
+    background: linear-gradient(135deg, #0284c7, #6d28d9);
+    color: white;
+}
+
+.card-cyclone .card-action:hover {
+    box-shadow: 0 6px 20px rgba(2, 132, 199, 0.35);
+}
+
+/* ===== Footer ===== */
+.select-footer {
+    margin-top: 3rem;
+    text-align: center;
+    animation: fadeInUp 1s ease 0.2s both;
+}
+
+.select-footer p {
+    font-size: 0.75rem;
+    color: #475569;
+}
+
+.select-footer strong {
+    color: #64748b;
+}
+
+/* ===== Animations ===== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 700px) {
+    .cards-grid {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+    }
+
+    .select-title {
+        font-size: 2rem;
+    }
+}

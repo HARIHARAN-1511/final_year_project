@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDRDSS — Cyclone & Hurricane Tracker</title>
+    <meta name="description"
+        content="Real-time tropical cyclone and hurricane tracking with wind analysis, storm paths, and AI-powered disaster analysis.">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="/static/css/landing.css">
+</head>
+
+<body>
+
+    <!-- Animated background -->
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+    <div class="bg-glow bg-glow-3"></div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="nav-icon">🛡️</span>
+            <span class="nav-title">PDRDSS</span>
+        </div>
+        <div class="nav-links">
+            <a href="#cyclone-map">Map</a>
+            <a href="#cyclone-info">Active Storms</a>
+            <a href="#features">Features</a>
+            <a href="#data-sources">Data Sources</a>
+            <a href="/cyclone/dashboard">Dashboard</a>
+            <a href="/select" style="opacity:0.7;">← Back</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-badge">
+            <span class="badge-pulse"></span>
+            <span>Real-Time Cyclone Tracker</span>
+        </div>
+        <h1 class="hero-title">
+            Tropical Cyclone<br>
+            <span class="hero-gradient">Live Tracker & Analysis</span>
+        </h1>
+        <p class="hero-subtitle">
+            Monitor tropical cyclones and hurricanes worldwide in real time. Wind radii visualization,
+            Saffir-Simpson classification, and AI-powered impact analysis — powered by NOAA NHC data.
+        </p>
+
+        <!-- Location Search Bar -->
+        <div class="search-container" id="searchContainer">
+            <div class="search-input-wrapper">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="locationSearch" class="search-input"
+                    placeholder="Search by city, country, or coordinates (e.g. Miami, Caribbean, 25.7, -80.2)"
+                    autocomplete="off">
+                <button id="searchBtn" class="search-btn">
+                    <span>Search</span>
+                </button>
+                <button id="myLocationBtn" class="location-btn" title="Use my location">📍</button>
+            </div>
+            <div class="search-suggestions" id="searchSuggestions"></div>
+        </div>
+
+        <!-- Live Stats Counter -->
+        <div class="hero-stats">
+            <div class="stat">
+                <span class="stat-number" id="statActive">—</span>
+                <span class="stat-label">Active Storms</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <span class="stat-number" id="statHurricane">—</span>
+                <span class="stat-label">Hurricanes</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <span class="stat-number" id="statTropical">—</span>
+                <span class="stat-label">Tropical Storms</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <span class="stat-number" id="statMaxWind">—</span>
+                <span class="stat-label">Max Wind</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== CYCLONE MAP ===== -->
+    <section id="cyclone-map" class="map-section">
+        <div class="map-header">
+            <h2 class="section-title">🌪️ Active Cyclone Map</h2>
+            <p class="section-subtitle">Real-time map showing active tropical cyclones and hurricanes worldwide. Click
+                any marker for details.</p>
+        </div>
+        <div class="map-wrapper">
+            <div id="cycloneMap" class="earthquake-map"></div>
+            <div class="map-legend">
+                <div class="legend-title">Wind (Saffir-Simpson)</div>
+                <div class="legend-item"><span class="legend-dot"
+                        style="background:#22c55e;width:8px;height:8px;"></span> Depression</div>
+                <div class="legend-item"><span class="legend-dot"
+                        style="background:#3b82f6;width:10px;height:10px;"></span> Tropical Storm</div>
+                <div class="legend-item"><span class="legend-dot"
+                        style="background:#eab308;width:12px;height:12px;"></span> Cat 1</div>
+                <div class="legend-item"><span class="legend-dot"
+                        style="background:#f97316;width:14px;height:14px;"></span> Cat 2</div>
+                <div class="legend-item"><span class="legend-dot"
+                        style="background:#ea580c;width:16px;height:16px;"></span> Cat 3</div>
+                <div class="legend-item"><span class="legend-dot"
+                        style="background:#dc2626;width:18px;height:18px;"></span> Cat 4</div>
+                <div class="legend-item"><span class="legend-dot"
+                        style="background:#7c3aed;width:20px;height:20px;"></span> Cat 5</div>
+            </div>
+        </div>
+        <div class="map-status" id="mapStatus">
+            <span class="feed-live-dot"></span>
+            <span id="mapStatusText">Loading cyclone data from NOAA...</span>
+        </div>
+    </section>
+
+    <!-- ===== CYCLONE-PRONE REGIONS ===== -->
+    <section class="regions-section">
+        <h2 class="section-title">🌊 Cyclone-Prone Regions</h2>
+        <p class="section-subtitle">Quick access to tropical cyclone basins worldwide</p>
+        <div class="regions-grid">
+            <button class="region-btn" data-lat="25.76" data-lon="-80.19" data-name="Miami, Florida">
+                <span class="region-flag">🇺🇸</span>
+                <span class="region-name">Miami</span>
+            </button>
+            <button class="region-btn" data-lat="18.48" data-lon="-69.94" data-name="Caribbean">
+                <span class="region-flag">🌴</span>
+                <span class="region-name">Caribbean</span>
+            </button>
+            <button class="region-btn" data-lat="14.60" data-lon="120.98" data-name="Philippines">
+                <span class="region-flag">🇵🇭</span>
+                <span class="region-name">Philippines</span>
+            </button>
+            <button class="region-btn" data-lat="22.32" data-lon="114.17" data-name="Hong Kong">
+                <span class="region-flag">🇭🇰</span>
+                <span class="region-name">Hong Kong</span>
+            </button>
+            <button class="region-btn" data-lat="35.68" data-lon="139.69" data-name="Tokyo, Japan">
+                <span class="region-flag">🇯🇵</span>
+                <span class="region-name">Japan</span>
+            </button>
+            <button class="region-btn" data-lat="19.43" data-lon="-99.13" data-name="Mexico">
+                <span class="region-flag">🇲🇽</span>
+                <span class="region-name">Mexico</span>
+            </button>
+            <button class="region-btn" data-lat="20.59" data-lon="78.96" data-name="India">
+                <span class="region-flag">🇮🇳</span>
+                <span class="region-name">India</span>
+            </button>
+            <button class="region-btn" data-lat="-12.46" data-lon="130.84" data-name="Darwin, Australia">
+                <span class="region-flag">🇦🇺</span>
+                <span class="region-name">Australia</span>
+            </button>
+            <button class="region-btn" data-lat="23.81" data-lon="90.41" data-name="Bangladesh">
+                <span class="region-flag">🇧🇩</span>
+                <span class="region-name">Bangladesh</span>
+            </button>
+            <button class="region-btn" data-lat="-18.77" data-lon="46.87" data-name="Madagascar">
+                <span class="region-flag">🇲🇬</span>
+                <span class="region-name">Madagascar</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- ===== ACTIVE STORMS INFO ===== -->
+    <section id="cyclone-info" class="tracker-section">
+        <div class="tracker-header">
+            <div class="tracker-title-row">
+                <h2 class="section-title">🌀 Active Storms Status</h2>
+            </div>
+            <p class="section-subtitle" id="trackerSubtitle">Live data from NOAA National Hurricane Center</p>
+        </div>
+        <div class="tracker-stats" id="trackerStats">
+            <div class="tstat">
+                <span class="tstat-value" id="tstatActiveStorms">0</span>
+                <span class="tstat-label">Active Systems</span>
+            </div>
+            <div class="tstat">
+                <span class="tstat-value tstat-red" id="tstatMajorHurr">0</span>
+                <span class="tstat-label">Major Hurricanes</span>
+            </div>
+            <div class="tstat">
+                <span class="tstat-value tstat-orange" id="tstatHurr">0</span>
+                <span class="tstat-label">Hurricanes</span>
+            </div>
+            <div class="tstat">
+                <span class="tstat-value tstat-yellow" id="tstatTS">0</span>
+                <span class="tstat-label">Tropical Storms</span>
+            </div>
+            <div class="tstat">
+                <span class="tstat-value tstat-green" id="tstatDep">0</span>
+                <span class="tstat-label">Depressions</span>
+            </div>
+        </div>
+        <div class="eq-table-container">
+            <div id="cycloneCardsContainer"
+                style="padding:2rem;text-align:center;color:#94a3b8;font-size:0.9rem;">
+                Cyclone data loads from NOAA NHC. During quiet seasons there may be no active storms.
+                Use the dashboard for location-based cyclone analysis.
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features-section">
+        <h2 class="section-title">Cyclone Analysis Capabilities</h2>
+        <p class="section-subtitle">Comprehensive cyclone analysis powered by real-time NOAA data</p>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🌪️</div>
+                <h3>Storm Tracking</h3>
+                <p>Live tropical cyclone monitoring from NOAA NHC with position tracking and forecast paths.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💨</div>
+                <h3>Wind Radii</h3>
+                <p>Wind radii visualization showing 34kt, 50kt, and 64kt wind zones around active storms.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📈</div>
+                <h3>Saffir-Simpson Scale</h3>
+                <p>Automatic classification on the Saffir-Simpson Hurricane Wind Scale from TD to Category 5.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>ML Severity Engine</h3>
+                <p>RandomForest severity classifier using wind speed, pressure, and intensification as features.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🏥</div>
+                <h3>Resource Mapping</h3>
+                <p>Nearby hospitals, fire stations, and police stations from OpenStreetMap.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📄</div>
+                <h3>PDF Reports</h3>
+                <p>Download comprehensive analysis reports with all cyclone data, maps, and recommendations.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Data Sources Section -->
+    <section id="data-sources" class="sources-section">
+        <h2 class="section-title">Real-Time Data Sources</h2>
+        <p class="section-subtitle">All data sourced from verified, public, and authoritative APIs</p>
+        <div class="sources-grid">
+            <div class="source-card">
+                <div class="source-logo">NOAA</div>
+                <div class="source-name">National Hurricane Center</div>
+                <div class="source-desc">Tropical cyclone positions, wind radii, intensity, and forecasts</div>
+            </div>
+            <div class="source-card">
+                <div class="source-logo">GDELT</div>
+                <div class="source-name">Global Database of Events</div>
+                <div class="source-desc">Real-time news articles, ground reports, and situational updates</div>
+            </div>
+            <div class="source-card">
+                <div class="source-logo">OSM</div>
+                <div class="source-name">OpenStreetMap</div>
+                <div class="source-desc">Emergency facilities, infrastructure, and geocoding services</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <h2>Ready to Analyze?</h2>
+        <p>Launch the cyclone analysis dashboard</p>
+        <a href="/cyclone/dashboard" class="btn-launch btn-launch-lg">
+            <span class="btn-icon">🚀</span>
+            Launch Cyclone Dashboard
+        </a>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>⚠️ <strong>ACADEMIC PROTOTYPE</strong> — PDRDSS provides AI-assisted decision support for research purposes
+            only.</p>
+        <p class="footer-sub">Built with FastAPI · Leaflet.js · NOAA NHC · GDELT · OpenStreetMap</p>
+    </footer>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Auth JS -->
+    <script src="/static/js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => { requireAuth(); });
+    </script>
+    <!-- Cyclone Landing JS -->
+    <script src="/static/js/cyclone-landing.js"></script>
+
+</body>
+
+</html>

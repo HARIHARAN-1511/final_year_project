@@ -57,22 +57,41 @@ app.include_router(api_router)
 # ---------------------------------------------------------------------------
 # Frontend Routes
 # ---------------------------------------------------------------------------
+
+# Login page (entry point)
 @app.get("/")
-async def serve_index():
-    return FileResponse("static/index.html")
-
-@app.get("/dashboard")
-async def serve_dashboard():
-    return FileResponse("static/dashboard.html")
-
-@app.get("/login")
 async def serve_login():
     return FileResponse("static/login.html")
 
+# Disaster type selector
+@app.get("/select")
+async def serve_select():
+    return FileResponse("static/select.html")
+
+# Earthquake path
+@app.get("/earthquake")
+async def serve_earthquake():
+    return FileResponse("static/earthquake.html")
+
+@app.get("/earthquake/dashboard")
+async def serve_earthquake_dashboard():
+    return FileResponse("static/dashboard.html")
+
+# Cyclone path
+@app.get("/cyclone")
+async def serve_cyclone():
+    return FileResponse("static/cyclone.html")
+
+@app.get("/cyclone/dashboard")
+async def serve_cyclone_dashboard():
+    return FileResponse("static/dashboard.html")
+
+# Analysis history
 @app.get("/history")
 async def serve_history():
     return FileResponse("static/history.html")
 
+# Analytics
 @app.get("/analytics")
 async def serve_analytics():
     return FileResponse("static/analytics.html")

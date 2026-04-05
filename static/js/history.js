@@ -1,6 +1,5 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
-    requireAuth(); // Check if logged in
 
     const tableBody = document.querySelector('#historyTable tbody');
     const loadingDiv = document.getElementById('loading');
@@ -12,8 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (!response.ok) {
             if (response.status === 401) {
-                window.location.href = '/login';
-                return;
+                throw new Error('Unauthorized - please login');
             }
             throw new Error('Failed to fetch history');
         }

@@ -24,18 +24,25 @@
 
 <body>
 
-    <!-- Redirect to landing page on browser refresh (only if no analysis params) -->
+    <!-- Redirect to disaster-specific landing page on browser refresh (only if no analysis params) -->
     <script>
         const navEntry = performance.getEntriesByType("navigation")[0];
         if (navEntry && navEntry.type === "reload" && !window.location.search) {
-            window.location.replace("/");
+            const path = window.location.pathname;
+            if (path.startsWith('/earthquake')) {
+                window.location.replace('/earthquake');
+            } else if (path.startsWith('/cyclone')) {
+                window.location.replace('/cyclone');
+            } else {
+                window.location.replace('/select');
+            }
         }
     </script>
 
     <!-- ===== TOP STATUS BAR ===== -->
     <header id="topBar" class="top-bar">
         <div class="top-bar-left">
-            <a href="/" class="system-badge" title="Back to Landing Page">
+            <a href="/select" class="system-badge" title="Back to Selector" id="backLink">
                 <span class="badge-icon">🛡️</span>
                 <span class="badge-text">PDRDSS</span>
             </a>
@@ -321,9 +328,26 @@
     <!-- Auth JS -->
     <script src="/static/js/auth.js"></script>
     <script>
-        // Protect this page
+        // Protect this page & lock disaster type from URL
         document.addEventListener('DOMContentLoaded', () => {
             requireAuth();
+
+            const path = window.location.pathname;
+            const disasterSelect = document.getElementById('disasterType');
+            const backLink = document.getElementById('backLink');
+
+            if (path.startsWith('/earthquake')) {
+                disasterSelect.value = 'earthquake';
+                disasterSelect.style.display = 'none';
+                // Replace the label with fixed text
+                disasterSelect.parentElement.querySelector('.input-label').textContent = '⚡ Earthquake Analysis';
+                if (backLink) backLink.href = '/earthquake';
+            } else if (path.startsWith('/cyclone')) {
+                disasterSelect.value = 'cyclone';
+                disasterSelect.style.display = 'none';
+                disasterSelect.parentElement.querySelector('.input-label').textContent = '⚡ Cyclone Analysis';
+                if (backLink) backLink.href = '/cyclone';
+            }
         });
     </script>
 

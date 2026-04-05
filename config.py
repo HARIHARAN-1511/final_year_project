@@ -45,9 +45,9 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # ---------------------------------------------------------------------------
-# AI / LLM Config — Grok (xAI)
+# AI / LLM Config — Groq (LLM API)
 # ---------------------------------------------------------------------------
 import os
 GROK_API_KEY = os.environ.get("GROK_API_KEY", "")   # set via .env or system env var
-GROK_MODEL = "grok-3-mini"  # Free-tier xAI model
-GROK_API_URL = "https://api.x.ai/v1/chat/completions"
+GROK_MODEL = "llama-3.3-70b-versatile"  # Free-tier Groq model
+GROK_API_URL = "https://api.groq.com/openai/v1/chat/completions"
