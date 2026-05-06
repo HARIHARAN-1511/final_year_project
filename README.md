@@ -20,6 +20,7 @@
 - [Scoring Engine](#-scoring-engine)
 - [Data Sources & APIs](#-data-sources--apis)
 - [Project Structure](#-project-structure)
+- [Documentation & Research](#-documentation--research)
 - [Installation](#-installation)
 - [Usage](#-usage)
 - [API Endpoints](#-api-endpoints)
@@ -33,6 +34,9 @@
 | Feature | Description |
 |---|---|
 | **Live Disaster Feed** | Real-time earthquake (USGS) and cyclone (NOAA NHC) data on an interactive dark map |
+| **Dedicated Earthquake Tracker** | Full-featured earthquake monitoring page with real-time USGS data and interactive map |
+| **Dedicated Cyclone Tracker** | Full-featured cyclone monitoring page with NOAA NHC data and wind field visualization |
+| **Disaster Type Selection** | Clean selection interface to choose between earthquake and cyclone analysis workflows |
 | **ML Severity Classification** | RandomForest classifiers predict earthquake & cyclone severity from raw sensor data |
 | **NLP News Urgency** | DistilBERT zero-shot classifier scores news article urgency (replaces keyword counting) |
 | **ML Resource Forecasting** | GradientBoosting models predict demand for 10 resource types based on severity & population |
@@ -58,6 +62,8 @@ PDRDSS integrates **5 AI/ML models** — implemented as separate, independently 
 ### Model 1 — Earthquake Severity Classifier (RandomForest)
 
 **File:** `ml_models/train_severity_classifier.py` → saves `ml_models/severity_model.pkl`  
+**Evaluation:** `ml_models/evaluate_severity_classifier.py` → outputs confusion matrix, per-class metrics  
+**ROC Analysis:** `ml_models/roc_curve_analysis.py` → generates ROC curves with AUC scores  
 **Integration:** `scoring_engine.py` → `predict_severity(magnitude, depth_km, tsunami_flag)`
 
 | Metric | Value |
@@ -66,6 +72,7 @@ PDRDSS integrates **5 AI/ML models** — implemented as separate, independently 
 | Features | Magnitude, depth (km), tsunami flag |
 | Classes | CATASTROPHIC · SEVERE · MODERATE · MINOR |
 | Accuracy | **93%** on held-out test set |
+| ROC-AUC | **0.9947** macro-average |
 
 - Replaces hardcoded `if mag >= 7.0` threshold rules
 - A shallow M6.5 with a tsunami flag correctly escalates to CATASTROPHIC
@@ -226,6 +233,10 @@ PDRDSS integrates **5 AI/ML models** — implemented as separate, independently 
 │  │ Landing  │  │Dashboard │  │ History  │  │   Analytics   │   │
 │  │  + Map   │  │  + ML UI │  │   Logs   │  │    Charts     │   │
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────┬────────┘   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                      │
+│  │Earthquake│  │ Cyclone  │  │  Select  │                      │
+│  │ Tracker  │  │ Tracker  │  │  Page    │                      │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘                      │
 └───────┴─────────────┴─────────────┴────────────────┴────────────┘
                        │ REST API (JSON)
 ┌──────────────────────▼──────────────────────────────────────────┐
@@ -280,6 +291,20 @@ Score = (0.4 × Severity) + (0.3 × Population) + (0.2 × Resource Distance) + (
 
 ---
 
+## 🔌 Data Sources & APIs
+
+| Source | Type | Endpoint | Data Used |
+|---|---|---|---|
+| **USGS** | REST API | `earthquake.usgs.gov/fdsnws/event/1/query` | Real-time seismic events (magnitude, depth, coordinates, tsunami flag) |
+| **NOAA NHC** | GIS JSON | `www.nhc.noaa.gov/gis/` | Active cyclone advisories (wind speed, pressure, track, wind radii) |
+| **GDELT DOC 2.0** | REST API | `api.gdeltproject.org/api/v2/doc/doc` | Real-time disaster news articles for NLP urgency scoring |
+| **OpenStreetMap Overpass** | REST API | `overpass-api.de/api/interpreter` | Nearby hospitals, fire stations, police stations |
+| **Nominatim (OSM)** | REST API | `nominatim.openstreetmap.org/search` | Forward geocoding (place name → lat/lon) |
+| **WorldPop** | Raster Data | Population density grid | Estimated population within impact zones |
+| **xAI Grok** | REST API | `api.x.ai/v1/chat/completions` | LLM-generated situation reports (grok-3-mini) |
+
+---
+
 ## 📁 Project Structure
 
 ```
@@ -299,37 +324,96 @@ PRDSSS/
 ├── requirements.txt         # Python dependencies
 ├── Dockerfile               # Container image definition
 ├── docker-compose.yml       # Container orchestration
-├── ARCHITECTURE.md          # Detailed system architecture diagrams
+├── .env.example             # Environment variable template
 ├── .gitignore               # Git ignore rules
 │
-├── ml_models/               # 🤖 AI/ML Model Package
-│   ├── __init__.py
-│   ├── train_severity_classifier.py       # Train earthquake severity RF model
-│   ├── train_cyclone_severity_classifier.py  # Train cyclone severity RF model
-│   ├── train_resource_forecaster.py       # Train resource demand GBR models
-│   ├── news_classifier.py                 # DistilBERT NLP urgency wrapper
-│   ├── anomaly_detector.py                # IsolationForest for earthquakes
-│   ├── cyclone_anomaly_detector.py        # IsolationForest for cyclones
-│   ├── severity_model.pkl                 # Trained earthquake classifier
-│   ├── cyclone_severity_model.pkl         # Trained cyclone classifier
-│   └── resource_model.pkl                 # Trained resource forecaster (10 models)
+├── ARCHITECTURE.md              # System architecture diagrams
+├── ARCHITECTURE_EXPLANATION.md  # Detailed architecture documentation
+├── results_discussion.md        # Results & Discussion (research paper section)
+├── eda_section_draft.md         # Exploratory Data Analysis draft
 │
-└── static/                  # Frontend assets
-    ├── index.html            # Landing page with live disaster feed + earthquake tracker
-    ├── dashboard.html        # Analysis dashboard with interactive map
-    ├── login.html            # User authentication page
-    ├── history.html          # Past analysis logs viewer
-    ├── analytics.html        # Analytics charts & statistics
-    ├── css/
-    │   ├── landing.css       # Landing page styles
-    │   └── style.css         # Dashboard & global styles
-    └── js/
-        ├── landing.js        # Live feed, earthquake tracker, search & map logic
-        ├── app.js            # Dashboard map, ML analysis rendering
-        ├── auth.js           # Token management & auth helpers
-        ├── history.js        # History page logic
-        └── analytics.js      # Chart rendering & stats
+├── ml_models/                   # 🤖 AI/ML Model Package
+│   ├── __init__.py
+│   ├── train_severity_classifier.py         # Train earthquake severity RF model
+│   ├── train_cyclone_severity_classifier.py # Train cyclone severity RF model
+│   ├── train_resource_forecaster.py         # Train resource demand GBR models
+│   ├── evaluate_severity_classifier.py      # Evaluation metrics & confusion matrix
+│   ├── roc_curve_analysis.py                # ROC curve generation & AUC analysis
+│   ├── export_datasets.py                   # Export synthetic training datasets to CSV
+│   ├── news_classifier.py                   # DistilBERT NLP urgency wrapper
+│   ├── anomaly_detector.py                  # IsolationForest for earthquakes
+│   ├── cyclone_anomaly_detector.py          # IsolationForest for cyclones
+│   ├── severity_model.pkl                   # Trained earthquake classifier
+│   ├── cyclone_severity_model.pkl           # Trained cyclone classifier
+│   ├── resource_model.pkl                   # Trained resource forecaster (10 models)
+│   ├── earthquake_severity_dataset.csv      # Earthquake training data (exported)
+│   ├── cyclone_severity_dataset.csv         # Cyclone training data (exported)
+│   └── resource_demand_dataset.csv          # Resource demand training data (exported)
+│
+├── static/                      # Frontend assets
+│   ├── index.html               # Landing page with live disaster feed
+│   ├── select.html              # Disaster type selection page
+│   ├── earthquake.html          # Dedicated earthquake tracker & dashboard
+│   ├── cyclone.html             # Dedicated cyclone tracker & dashboard
+│   ├── dashboard.html           # Analysis dashboard with interactive map
+│   ├── login.html               # User authentication page
+│   ├── history.html             # Past analysis logs viewer
+│   ├── analytics.html           # Analytics charts & statistics
+│   ├── css/
+│   │   ├── landing.css          # Landing page styles
+│   │   ├── select.css           # Selection page styles
+│   │   └── style.css            # Dashboard & global styles
+│   └── js/
+│       ├── landing.js           # Live feed, search & map logic
+│       ├── earthquake-landing.js # Earthquake tracker page logic
+│       ├── cyclone-landing.js   # Cyclone tracker page logic
+│       ├── app.js               # Dashboard map, ML analysis rendering
+│       ├── auth.js              # Token management & auth helpers
+│       ├── history.js           # History page logic
+│       └── analytics.js        # Chart rendering & stats
+│
+├── eda_*.png                    # EDA visualizations (confusion matrix, ROC, histograms, etc.)
+├── roc_curve_severity.png       # ROC curve plot from model evaluation
+├── *_diagram.jpg                # System architecture & UML diagrams
+└── draw_*.py                    # Diagram generation scripts
 ```
+
+---
+
+## 📄 Documentation & Research
+
+The repository includes research documentation and evaluation artifacts:
+
+| File | Description |
+|---|---|
+| `ARCHITECTURE_EXPLANATION.md` | Detailed system architecture documentation with component descriptions |
+| `results_discussion.md` | Results & Discussion section — cross-validation performance, per-class analysis, ROC curves, feature importance |
+| `eda_section_draft.md` | Exploratory Data Analysis section draft |
+
+### EDA Visualizations
+
+| Visualization | File |
+|---|---|
+| Confusion Matrix | `eda_confusion_matrix.png` |
+| ROC Curve (One-vs-Rest) | `eda_roc_curve.png`, `roc_curve_severity.png` |
+| Feature Importance | `eda_feature_importance.png` |
+| Earthquake Magnitude Distribution | `eda_earthquake_magnitude_histogram.png` |
+| Earthquake Class Distribution | `eda_earthquake_class_distribution.png` |
+| Cyclone Windspeed Distribution | `eda_cyclone_windspeed_histogram.png` |
+| Comparative Analysis | `eda_comparative_analysis.png` |
+| True vs Predicted Line Graph | `eda_line_graph.png` |
+
+### Architecture Diagrams
+
+| Diagram | File |
+|---|---|
+| Functional Block Diagram | `pdrdss_functional_block_diagram.jpg` |
+| Detailed Block Diagram | `pdrdss_detailed_block_diagram.jpg` |
+| AI/ML Core Diagram | `aiml_core_diagram.jpg` |
+| Data Flow Diagram | `data_flow_diagram.jpg` |
+| Service Orchestrator | `service_orchestrator_diagram.jpg` |
+| UML Class Diagram | `uml_class_diagram.jpg` |
+| UML Use Case Diagram | `uml_use_case.jpg` |
 
 ---
 
@@ -366,7 +450,13 @@ PRDSSS/
    pip install -r requirements.txt
    ```
 
-4. **Train the ML models** (one-time setup — takes ~30 seconds)
+4. **Configure environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your GROK_API_KEY
+   ```
+
+5. **Train the ML models** (one-time setup — takes ~30 seconds)
    ```bash
    python ml_models/train_severity_classifier.py
    python ml_models/train_cyclone_severity_classifier.py
@@ -374,12 +464,12 @@ PRDSSS/
    ```
    > The trained `.pkl` files are already committed to the repository, so this step is only needed if you delete them.
 
-5. **Create an admin user** (optional — for authenticated features)
+6. **Create an admin user** (optional — for authenticated features)
    ```bash
    python create_admin.py
    ```
 
-6. **Run the application**
+7. **Run the application**
    ```bash
    python -m uvicorn main:app --host 0.0.0.0 --port 8000
    ```
@@ -389,18 +479,21 @@ PRDSSS/
 
 ## 💻 Usage
 
-1. **Landing Page** (`/`) — View real-time earthquake tracker (EarthquakeTrack-style) and active cyclone feed
-2. **Search** — Enter a location name (e.g., "Tokyo", "Mumbai") or coordinates (lat, lon)
-3. **Dashboard** (`/dashboard`) — Run ML-powered disaster impact analysis on any location
-4. **Analysis Panels** — View:
+1. **Landing Page** (`/`) — View real-time earthquake tracker and active cyclone feed
+2. **Select Disaster Type** (`/select`) — Choose between earthquake or cyclone analysis
+3. **Earthquake Tracker** (`/earthquake`) — Dedicated earthquake monitoring with real-time USGS data
+4. **Cyclone Tracker** (`/cyclone`) — Dedicated cyclone monitoring with NOAA NHC data
+5. **Search** — Enter a location name (e.g., "Tokyo", "Mumbai") or coordinates (lat, lon)
+6. **Dashboard** (`/dashboard`) — Run ML-powered disaster impact analysis on any location
+7. **Analysis Panels** — View:
    - ML-predicted severity (with model label)
    - Damage zones on interactive Leaflet map
    - ML-forecasted resource requirements (10 types)
    - Rescue team recommendations
    - 🤖 Grok AI situation report
    - ⚠ Anomaly badges on unusual events
-5. **History** (`/history`) — Browse past analysis reports
-6. **Analytics** (`/analytics`) — View aggregate statistics and charts
+8. **History** (`/history`) — Browse past analysis reports
+9. **Analytics** (`/analytics`) — View aggregate statistics and charts
 
 ---
 
